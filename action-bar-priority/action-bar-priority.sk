@@ -1,0 +1,46 @@
+# HOW TO USE
+# When sending an action bar, use the sendActionBar() function
+# The function will send the bar if the action bar isn't currently locked by a higher-priority bar.
+# If there's already a higher-priority request, it will return false and your action bar will not send.
+
+# Duration should be the time span the action bar should display for.
+# Source should be some text describing what the action bar is for, like "hud" or "mana display".
+# Priority is the importance of the action bar. 5 is highest, and will display over everything else. 0 is lowest, with 1-4 in the middle for various needs. 
+#     eg: A request of priority 4 will display over any previous request of priority 1-4, but not 5.
+
+# Example (coords hud updating every 2 ticks):
+# sendActionBar(player, "coords", 2 ticks, 0) is true:
+#
+#
+# There are also the functions actionBarIsLocked(), to see if there's any current action bar request going on,
+#   and actionBarLockoutSource(), which returns the source of the last request, mainly for debug purposes
+# 
+#
+# Action bar priority system
+function sendActionBar(player: player, text: text, duration: timespan, priority: number=0) :: boolean:
+    # is the action bar locked
+    if actionBarIsLocked({_player}) is true:
+        # can we override?
+        if {_priority} < {-actionbarlockout::%{_player}%::priority}:
+            # if it's locked and we can't override, we return false, saying it's locked.
+            return false
+    
+    # Set new actionbar lockout
+    set {-actionbarlockout::%{_player}%::time} to now # record lockout timestamp
+    set {-actionbarlockout::%{_player}%::duration} to {_duration} # record lockout duration
+    set {-actionbarlockout::%{_player}%::priority} to {_priority} # record what priority the lockout is 
+
+    # Send the new actionbar
+    send action bar {_text} to {_player}
+
+    return true
+    
+# Check for locked action bar without locking it yourself
+function actionBarIsLocked(player: player) :: boolean:
+    if difference between {-actionbarlockout::%{_player}%::time} and now is less than {-actionbarlockout::%{_player}%::duration}:
+        return true
+    return false
+    
+on join:
+    set {-actionbarlockout::%player%::time} to now
+    set {-actionbarlockout::%player%::duration} to 1 tick

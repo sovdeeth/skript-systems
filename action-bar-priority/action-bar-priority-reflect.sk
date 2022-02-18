@@ -1,0 +1,40 @@
+# HOW TO USE
+# When sending an action bar, use:
+# send action bar "text" with priority 1 to player [for 2 seconds]
+
+# The duration does not change the length of time the player sees the actionbar, but it does prevent lower-priority messages for showing for that time
+# If it is omitted, the duration defaults to 2 seconds.
+
+# THIS REQUIRES SKRIPT-REFLECT
+
+effect:
+    patterns:
+        (send|display) action[( |-)]bar [with text] %text% [with] priority [level] %number% to %players% [for %-timespan%]
+    trigger:
+        set {_content} to expr-1
+        set {_priority} to expr-2
+        set {_recipients::*} to expr-3
+        set {_duration} to expr-4 if expr-4 is set else 2 seconds
+
+        loop {_recipients::*}:
+            # is the action bar locked
+            if difference between {-actionbarlockout::%loop-value%::time} and now is less than {-actionbarlockout::%loop-value%::duration}:
+                # can we override?
+                if {_priority} < {-actionbarlockout::%loop-value%::priority}:
+                    # if it's locked and we can't override, we continue
+                    continue
+            
+            # Set new actionbar lockout
+            set {-actionbarlockout::%loop-value%::time} to now # record lockout timestamp
+            set {-actionbarlockout::%loop-value%::duration} to {_duration} # record lockout duration
+            set {-actionbarlockout::%loop-value%::priority} to {_priority} # record what priority the lockout is 
+
+            # Send the new actionbar
+            send action bar {_content} to loop-value
+
+
+on join:
+    set {-actionbarlockout::%player%::time} to now
+    set {-actionbarlockout::%player%::duration} to 1 tick
+
+
