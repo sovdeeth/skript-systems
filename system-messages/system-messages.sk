@@ -11,13 +11,13 @@
 # [1] inserts with accent, but no quotes
 # {1} inserts with accent and quotes
 
-variables:
-    sys-colour::main: <##aaaaaa>
-    sys-colour::accent: <##ffffff>
-    sys-colour::info: <##777777>
-    sys-colour::warning: &c
-    sys-colour::error: &4
-    sys-colour::success: &2
+on load:
+    set {sys-colour::main} to "&7"
+    set {sys-colour::accent} to "&8"
+    set {sys-colour::info} to "&7"
+    set {sys-colour::warning} to "&c"
+    set {sys-colour::error} to "&4"
+    set {sys-colour::success} to "&2"
 
 options:
     cm: %{sys-colour::main}%
@@ -26,7 +26,7 @@ options:
 
 
 function systemMessage(level: text, msg: text, inputs: objects = "none") :: string:
-    set {_prefix} to formatted "%{colour::%{_level}%}%{@prefix}{@cm}"
+    set {_prefix} to formatted "%{sys-colour::%{_level}%}%{@prefix}{@cm}"
     
     if {_inputs::1} is "none":
         return formatted "%{_prefix}% %{_msg}%"
@@ -45,11 +45,8 @@ function sysMsg(l: text, m: text, i: objects = "none") :: string:
 function sm(l: text, m: text, i: objects = "none") :: string:
     return systemMessage({_l}, {_m}, {_i::*})
     
-command /systemMessageExamples:
+command /systemMessageExample:
     permission: server.admin
     trigger:
-        send systemMessage("info","[1]'s character is named {2}.", (player, "Sovde"))
-        send systemMessage("warning","Are you sure you want to rename your character? Run [1] to confirm.", ("/rename confirm"))
-        send sysMsg("success","Renamed your character to {1}!", ("Edvos"))
-        send sm("error","Character names cannot be more than (1) characters!", (96))
+        send systemMessage("info","[1]'s nickname is {2}.", (player, "Sovde"))
         

@@ -1,0 +1,248 @@
+options:
+
+    # Chat default colours
+    default-name-colour: &f
+    default-chat-colour: &f
+    # Colours for the dots preceeding names.
+    default-dot-colour: &7
+    staff-dot-colour: &6
+    # Colour of /me messages
+    action-message-colour: &7
+    # Out of range occurs when a player in local chat mode recieves a message from outside their range.
+    out-of-range-colour: &7
+
+    # Mention sound
+    mention-sound: "block.note_block.bell" with pitch 1.4
+
+    # Player Info Card -- Appearance
+    player line 0: %{_namecolour}%%{_sender}%
+    player line 1: &7Nickname: &f%{chat::%{_sender}%::nickname} if {chat::%{_sender}%::nickname} is set else {_sender}%
+    player line 2: &7Rank: &f%{chat::%{_sender}%::rank} if {chat::%{_sender}%::rank} is set else "Default"%
+    
+    # Message Info Card -- Appearance
+    message line 1: &7Message from %{_namecolour}%%{_sender}%
+    message line 2: &7Message Type: &f%{_type}%
+    message line 3: &7Time: &f%now%
+    message line 4: &7Reach: &f%{_receiversize}% player(s)
+
+
+
+on chat:
+    # intercept chat messages
+    cancel event 
+    set {_sender} to event-player # gets player name
+    
+    # redirect messages for commands/other functions
+    # example code to trigger this given in the README
+    if {chat::redirect::%player%} is set:
+        set {chat::redirect::%player%::message} to message
+        clear {chat::redirect::%player%}
+        stop
+    
+    if {chat::%player%::mode} contains "quiet":
+        send " &cYou can't chat while in quiet mode."
+        stop
+    if {chat::muted::%player%} is set:
+        send " &cYou're muted and can't chat."
+        stop
+            
+    # silence check
+    if {silence} is set:
+        if player does not have permission "server.admin":
+            send " &cChat is silenced and you can't chat."
+            stop
+
+    # chat basic formatting, preventing <> formatting issues
+    replace all "<3" with "❤" in message
+    replace all ">" with "→" in message
+    replace all "<" with "←" in message
+    set {_message} to uncolored message # gets content of message
+    
+    # checking for local chat & getting radius
+    set {_chatradius} to {chat::%player%::local} if {chat::%player%::local} is set else -1
+    
+    set {_type} to "chat"
+
+    # formatting components & forwarding them to receiver
+    chatFormatComponents({_sender}, {_message}, {_chatradius}, {_type})
+
+# Catch /me and reformat
+# Action messages
+function actionMessage(sender: player, message: text):
+    # gets content of message
+    set {_message} to uncolored {_message} 
+    # checking for local chat & getting radius
+    set {_chatradius} to {chat::%{_sender}%::local} if {chat::%{_sender}%::local} is set else -1
+
+    set {_type} to "me"
+        
+    # formatting components & forwarding them to receiver
+    chatFormatComponents({_sender}, {_message}, {_chatradius}, {_type})
+
+command /me <text>:
+    trigger:
+        actionMessage(player, arg 1)
+
+
+# Universal formatting
+
+function chatFormatComponents(sender: player, message: text, chatradius: integer, type: text):
+
+    # sets player's name colour & format based on chat type
+    if {_type} contains "action":
+        set {_nameformat} to "&o"
+    else:
+        set {_nameformat} to ""
+
+    set {_namecolour} to {chat::%{_sender}%::name-colour} if {chat::%{_sender}%::name-colour} is set else "{@default-name-colour}"
+    set {_name} to {chat::%{_sender}%::nickname} if {chat::%{_sender}%::nickname} is set else {_sender}
+    set {_name} to formatted "%{_namecolour}%%{_nameformat}%%{_name}%" 
+
+        
+    # formats dot
+    set {_dotcolour} to formatted "{@default-dot-colour}" # DEFAULT
+    if {chat::staff::%{_sender}%} is set:
+        set {_dotcolour} to formatted "{@staff-dot-colour}"
+    
+    # formats chat message (emojis)
+    replace all ":sword:" with "🗡" in {_message}
+    replace all ":bow:" with "🏹" in {_message}
+    replace all ":trident:" with "🔱" in {_message}
+    replace all ":potion:" with "🧪" in {_message}
+    replace all ":splash_potion:" with "⚗" in {_message}
+    replace all ":fishing_rod:" with "🎣" in {_message}
+    replace all ":shield:" with "🛡" in {_message}
+    replace all ":axe:" with "🪓" in {_message}
+    
+    # formatting tags
+    replace all "$i" with formatted "&o" in {_message}
+    replace all "$b" with formatted "&l" in {_message}
+    replace all "$r" with formatted "<chatcolour>" in {_message} 
+    
+    # formats chat message (@a)
+    replace first "@a" with "[@]" in {_message}
+    
+    # checks for local chat & adds players in radius to list of receivers, unless the message contains [@]
+    set {_chatradiusdisplay} to ""
+    if {_chatradius} is -1:
+        set {_allreceivers} to true
+    else if {_message} contains "[@]":
+        set {_allreceivers} to true
+    else:
+        loop all players in radius {_chatradius} of {_sender}:
+            add loop-player to {_receivers::*}
+        set {_chatradiusdisplay} to "&7(%{_chatradius}%&7)"
+        
+    # checks for all players not in 'quiet' mode and adds them to list of receivers, if the sender is not in local chat
+    if {_allreceivers} is true:
+        loop all players:
+            if {chatstatus::%loop-player%} is not "quiet":
+                add loop-player to {_receivers::*}
+    
+    # gets size of receivers
+    set {_receiversize} to size of {_receivers::*} # gets size of receivers overall
+
+    # formats player info card & chat message info card
+    set {_playerinfo} to formatted "<suggest command:/msg %{_sender}% ><tooltip:{@player line 0}%nl%{@player line 1}%nl%{@player line 2}%nl%&8Click to message.>"
+    set {_messageinfo} to formatted "<suggest command:%{_message}%><tooltip:{@message line 1}%nl%{@message line 2}%nl%{@message line 3}%nl%{@message line 4}>"
+    
+    
+
+    set {_dot} to "%{_playerinfo}%%{_dotcolour}%•"
+    set {_name} to "%{_name}%%{_dotcolour}%" 
+    set {_message} to formatted "<chatcolour>%{_message}% %{_chatradiusdisplay}%"
+
+     # sending the chat message per player
+    loop {_receivers::*}:
+        chatReceiver({_sender}, (loop-value), {_dot}, {_name}, {_messageinfo}, {_message}, {_chatradius}, {_type})
+
+
+# Receiver: does per-player formatting, pinging
+
+function chatReceiver(sender: player, receiver: player, dot: text, name: text, messageinfo:text, message: text, chatradius: integer, type: text):
+    # general chat colour
+    if {_type} contains "chat":
+        set {_chatcolour} to {chat::%{_sender}%::chat-colour} if {chat::%{_sender}%::chat-colour} is set else "{@default-chat-colour}" 
+
+        if {chat::%{_receiver}%::monochromatic} is true:
+            set {_chatcolour} to "{@default-chat-colour}" 
+    else:
+        set {_chatcolour} to "{@action-message-colour}"
+    
+    
+        
+    # per-player chat colour
+    # quiet chat mode
+    if {chat::%{_receiver}%::mode} is "quiet":
+        stop
+        
+    # if local chat of sender is off
+    if {_chatradius} is -1:
+        # if local chat of receiver is on
+        if {localchat::%{_receiver}%} is set:
+                
+            # if distance between sender and receiver is within local chat radius, set chat colour to white
+            if distance between {_receiver} and {_sender} is not less than {localchat::%{_receiver}%}:
+                set {_chatcolour} to "{@out-of-range-colour}"
+            else if {localchat::%{_sender}%} is not set:
+                set {_chatcolour} to "{@out-of-range-colour}"
+            else if {_message} contains "[@]":
+                set {_chatcolour} to "{@out-of-range-colour}"
+    
+    
+
+    # handle tags with mono/full colour
+    replace all "<chatcolour>" with {_chatcolour} in {_message}
+
+
+    # sending the message
+    if {_type} is "chat":
+        send formatted " %{_dot}% %{_name}% - <reset>%{_messageinfo}%%{_message}%" to {_receiver}
+    else if {_type} is "me":
+        send formatted " %{_dot}% &o%{_name}% <reset>%{_messageinfo}%%{_message}%" to {_receiver}
+    if {_message} contains "%{_receiver}%":
+        play sound {@mention-sound} to {_receiver} 
+
+
+command /localchat [<integer>]:
+    aliases: /lc
+    trigger:
+        if {chat::%player%::local} is not set:
+            if arg 1 is not between 1 and 100:
+                send "&cDistance for local chat (%arg-1%&c) was not valid. Try a number between 1 and 100."
+                stop
+            set {chat::%player%::local} to arg 1
+            send " &7Enabled local chat and set your local chat radius to %arg-1%&7. Messages will only be received by players within this radius. Type /lc to disable local chat."
+        else:
+            delete {chat::%player%::local}
+            send " &7Disabled local chat."
+
+command /chat-monochrome:
+    trigger:
+        if {chat::%player%::monochromatic} is not set:
+            set {chat::%player%::monochromatic} to true
+            send "&7 Turned monochrome mode on."
+        else:
+            delete {chat::%player%::monochromatic}
+            send "&7 Turned monochrome mode off."
+
+
+command /chat-quiet:
+    trigger:
+        wait 1 tick
+        if {chat::%player%::mode} is "quiet":
+            broadcastInQuiet(player, false)
+            set {chat::%player%::mode} to "normal"
+            send " &7Set your chat mode to normal."
+        else:
+            broadcastInQuiet(player, true)
+            set {chat::%player%::mode} to "quiet"
+            send " &7Set your chat mode to quiet."
+
+function broadcastInQuiet(player: player, going-in: boolean):
+    if {chat::%{_player}%::mode} is not "quiet":
+        if {_going-in} is true:
+            send "&8&o %{_player}%&8&o has entered quiet mode." to all players where [{chat::%input%::mode} is not "quiet"]
+    else if {chat::%{_player}%::mode} is "quiet":
+        send "&8&o %{_player}%&8&o has left quiet mode." to all players where [{chat::%input%::mode} is not "quiet"]
+        send "&8&o %{_player}%&8&o has left quiet mode." to {_player}
