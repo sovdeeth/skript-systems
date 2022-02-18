@@ -1,0 +1,246 @@
+# Handles storing, restoring, and viewing player inventory backups
+# Contains:
+#   /invrestore
+#    viewBackup()
+#   restoreBackup()
+
+options:
+    cm: <##888898>
+    ca: <##BBCCD7>
+    cw: <##DD8c8c>
+    ce: <##FF3434>
+    cs: <##22AA62>
+    max-deaths-stored: 5
+    directory: plugins/Skript/scripts/inventory-backups
+
+
+on load:
+    set {invrestore::abort} to false
+    if {@max-deaths-stored} < 1:
+        set {invrestore::abort} to true
+        loop all players where [player input has permission "admin"]:
+            send "test" to loop-player
+            send formatted "{@ce} Inventory Restore cannot store 0 or fewer deaths. %nl% Please set max-death-stored to at least 1." to loop-value
+
+
+# storing death data
+on death of player:
+    if {invrestore::abort} is true:
+        stop
+    # load player's log file
+    load yaml "{@directory}/%player%-deaths.yml" as "log"
+
+    # get death number
+    if yaml path "deathcounter" in "log" does not exist:
+        set yaml value "deathcounter" in "log" to 0
+        set {_count} to 0
+    else:
+        set {_count} to yaml value "deathcounter" in "log"
+
+    # increment death number and save meta-data
+    add 1 to {_count}
+    set yaml value "deaths.%{_count}%.timestamp" in "log" to now
+    set yaml value "deaths.%{_count}%.location" in "log" to victim's location
+    set yaml value "deaths.%{_count}%.message" in "log" to death message
+
+    # save the inventory
+    set yaml list "deaths.%{_count}%.inv" in "log" to all items in victim's inventory
+
+    # delete extraneous backups
+    deleteExtraBackups("log")
+
+    # update death count
+    set yaml value "deathcounter" in "log" to {_count}
+    save yaml "log"
+    unload yaml "log"
+
+
+
+
+
+# inv restore command
+command /invrestore <offline player> [<integer=1>]:
+    permission: admin
+    trigger:
+        if {invrestore::abort} is true:
+            send formatted "{@ce} Inventory Restore cannot store 0 or fewer deaths. %nl% Please set max-death-stored to at least 1." 
+            stop
+
+        load yaml "{@directory}/%arg-1%-deaths.yml" as "%arg-1%-log"
+
+        deleteExtraBackups("%arg-1%-log")
+
+        set {_nodes::*} to reversed yaml node list "deaths" from "%arg-1%-log"
+        set {_total-nodes} to size of {_nodes::*}
+
+        set {_page} to arg-2 
+        set {_index} to 5 * ({_page} - 1) + 1
+
+
+        create gui with virtual chest inventory with 3 rows named formatted "&8Inventory Backups: %arg-1%" and shape "0000h0000", "001234500", and "000b0n000":
+
+            # info item, head of player
+            make gui slot "h" with arg-1's head named "{@ca}%arg-1%'s {@cm}Inventory Backups"
+            
+            # loop through all the recorded deaths
+            set {_display-count} to min(5, {_total-nodes} - {_index} + 1)
+            loop {_display-count} times:
+
+                set {_node} to {_nodes::%{_index}%}
+                
+                # get all the meta-data
+                set {_death-count} to the last element of ("%{_node}%" split at ".") # getting the id from the whole path string
+
+                set {_timestamp} to yaml value "%{_node}%.timestamp" from "%arg-1%-log"
+                set {_location} to yaml value "%{_node}%.location" from "%arg-1%-log"
+                set {_message} to yaml value "%{_node}%.message" from "%arg-1%-log"
+                set {_inv::*} to yaml list "%{_node}%.inv" from "%arg-1%-log"
+
+                # setup item
+                set {_item} to skeleton skull named "Death ##%{_death-count}%"
+                clear {_lore::*}
+                
+                # add meta-data to item lore
+                set {_lore::1} to "&7&o""%{_message}%"""
+                set {_lore::2} to "{@ca}Timestamp: {@cm}%{_timestamp}%"
+                
+                # get location and format into xyz and world separately
+                set {_location::*} to "%{_location}%" split at ", "
+                set {_world::*} to {_location::5} split at "in "
+                set {_world} to {_world::2} 
+                set {_lore::3} to "{@ca}Location: {@cm}%{_location::1}%, %{_location::2}%, %{_location::3}%"
+                set {_lore::4} to "{@ca}World: {@cm}%{_world}%" 
+                set {_lore::5} to "" 
+                
+                # add instructions to lore
+                set {_lore::6} to "{@ca}Left-click {@cm}to {@ca}view {@cm}the backup" 
+                set {_lore::7} to "{@ca}Right-click {@cm}to {@ca}restore {@cm}the backup" 
+                set {_lore::8} to "{@ca}Shift-left-click {@cm}to {@ca}teleport {@cm}the to death location" 
+                set {_lore::9} to "{@ca}Shift-right-click {@cm}to {@ca}delete {@cm}the backup" 
+                
+                # check if backup has already been restored to player
+                if yaml value "%{_node}%.restored" from "%arg-1%-log" is true:
+                    set {_lore::10} to "%nl%{@cw}This backup has been previously restored!" 
+                    
+                # set the item's lore to meta-data + instructions
+                set lore of {_item} to {_lore::*}
+                
+                # save player for click-events
+                set {_p} to arg-1
+                
+                # format the death gui slots 
+                make gui slot "%loop-value%" with {_item}:
+                    # if left, view
+                    if gui click type is left mouse button:
+                        viewBackup(player, {_p}, {_death-count}, {_location})
+                    # if right, restore
+                    if gui click type is right mouse button:
+                        restoreBackup({_p}, {_death-count})
+                        close player's inventory
+                        send action bar "{@cs}Restored backup!" to player
+                    # if left-shift, teleport
+                    if gui click type is left mouse button with shift:
+                        teleport player to {_location}
+                        close player's inventory
+                    # if right-shift, delete
+                    if gui click type is right mouse button with shift:
+                        delete yaml path list "deaths.%{_death-count}%" in "%{_p}%-log"
+                        save yaml "%{_p}%-log"
+                        make player execute command "/invrestore %{_p}%"
+                
+                
+                # check if we need to add page management items
+                if {_total-nodes} > 5*{_page}:
+                    make gui slot "n" with book named "{@cm}Next Page":
+                        make player execute command "/invrestore %{_p}% %{_page} + 1%"
+                        
+                if {_index} > 5:
+                    make gui slot "b" with book named "{@cm}Previous Page":
+                        make player execute command "/invrestore %{_p}% %{_page} - 1%"
+                
+                # increment the counter value
+                add 1 to {_index}
+                    
+        open last gui to player
+
+# viewing the backups
+function viewBackup(viewer: player, player: offline player, id: string, loc: location):
+    close {_viewer}'s inventory
+    create gui with virtual chest inventory with 6 rows named formatted "&8Backup %{_id}% for %{_player}%" with shape "123456789", "xyz-efghi", "jklmnopqr", "stuvwABCD","EFGHIJKLM", and "0a0b0c0d0":
+        # get inv data
+        set {_inv::*} to yaml list "deaths.%{_id}%.inv" from "%{_player}%-log"
+        # format slot with the items
+        loop {_inv::*}:
+            make next gui slot with moveable loop-value
+        # return item
+        make gui slot "a" with red stained glass pane named "{@cm}Return to Overview":
+            make {_viewer} execute command "/invrestore %{_player}%"
+        # restore item
+        make gui slot "b" with green stained glass pane named "{@ca}Restore {@cm}this backup to {@ca}%{_player}%" with lore "{@ca}Shift-click {@cm}to overwrite their current inventory.":
+            if {_player} is offline:
+                send formatted "{@ce} Player is offline!" to {_viewer}
+                stop
+            # handle whether to overwrite or simply give
+            if gui click type is right mouse button with shift or left mouse button with shift:
+                restoreBackup({_player}, {_id}, true)
+            else:
+                restoreBackup({_player}, {_id})
+            close {_viewer}'s inventory
+            send formatted "{@cs} Restored backup!" to {_viewer}
+        # teleport item
+        make gui slot "c" with ender pearl named "{@ca}Teleport {@cm}to the death loation":
+            teleport {_viewer} to {_loc}
+        # delete item
+        make gui slot "d" with barrier named "{@cw}Delete {@cm}this backup":
+            delete yaml path list "deaths.%{_id}%" in "%{_player}%-log"
+            save yaml "%{_player}%-log"
+            make {_viewer} execute command "/invrestore %{_player}%"
+    open last gui to {_viewer}
+
+
+
+
+
+# restoring a backup
+function restoreBackup(player: player, id: string, overwrite: boolean=false):
+    # clear inv if necessary
+    if {_overwrite} is true:
+        clear {_player}'s inventory
+    # loop inventory to give back to player (will overflow onto ground)
+    set {_inv::*} to yaml list "deaths.%{_id}%.inv" from "%{_player}%-log"
+    if {_player} can't hold {_inv::*}:
+        drop {_inv::*} at {_player}
+    else:
+        give {_inv::*} to {_player}
+        
+
+    # send confirmations
+    send formatted "{@cs} Your inventory has been restored!" to {_player}
+    play sound "block.note_block.bell" with volume 1 at pitch 1.2 to {_player}
+
+    # mark as restored, save and close
+    set yaml value "deaths.%{_id}%.restored" from "%{_player}%-log" to true
+    save yaml "%{_player}%-log"
+    unload yaml "%{_player}%-log"
+
+
+
+
+
+# delete extraneous backups
+function deleteExtraBackups(filename: string):
+    # first ensure there are extra backups to delete
+    set {_total-nodes} to (size of yaml node list "deaths" of "%{_filename}%")
+    if {_total-nodes} > {@max-deaths-stored}: 
+        # start our counter at 0
+        set {_i} to 0
+        loop yaml node list "deaths" from "%{_filename}%":
+            # stop if we have the correct amount left
+            if {_i} = {_total-nodes} - {@max-deaths-stored}:
+                exit loop
+            # delete yaml 
+            delete yaml path list loop-key in "%{_filename}%"
+            #increment counter
+            add 1 to {_i}
+        # save file
+        save yaml "%{_filename}%"   

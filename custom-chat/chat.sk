@@ -25,7 +25,10 @@ options:
     message line 3: &7Time: &f%now%
     message line 4: &7Reach: &f%{_receiversize}% player(s)
 
-
+# TODO
+# 
+# add /mute command
+# add pictures to github
 
 on chat:
     # intercept chat messages
