@@ -1,0 +1,5 @@
+# todo
+effect:
+    patterns:
+        (send|display) (system|sys)[( |-)](message|msg) %text% [with] type %text% [and] objects %objects% [to %-players/console%]
+    trigger:
