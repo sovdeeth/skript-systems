@@ -8,7 +8,7 @@ The skript mainly runs through a GUI accessible through ``/invrestore <player>``
 
 A left click will open the backup to you, showing all their items and allowing you to pull specific items out. This will not remove them from the backup, you're simply making a copy of the item. This screen will also show individual buttons for the other actions.
 
-Right clicking will give the backup to the player without clearing their current inventory. If you wish to clear their existing items, you can shift-right-click on the restore button when viewing the backup. 
+Right clicking will give the backup to the player without clearing their current inventory. If their inventory is full, the rest of the items will drop on the ground at the player. If you wish to clear their existing items, you can shift-right-click on the restore button when viewing the backup.
 
 Shift-left-clicking will teleport you to the location that the player died.
 
