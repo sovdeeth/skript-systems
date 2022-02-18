@@ -1,5 +1,40 @@
-# todo
-effect:
+variables:
+    sys-colour::main: <##aaaaaa>
+    sys-colour::accent: <##ffffff>
+    sys-colour::info: <##777777>
+    sys-colour::warning: &c
+    sys-colour::error: &4
+    sys-colour::success: &2
+
+options:
+    cm: %{sys-colour::main}%
+    ca: %{sys-colour::accent}%
+    prefix: [!]
+
+expression:
     patterns:
-        (send|display) (system|sys)[( |-)](message|msg) %text% [with] type %text% [and] objects %objects% [to %-players/console%]
-    trigger:
+        (system|sys)[( |-)](message|msg) %text% [with] type %text% [[and] objects %-objects%]
+    parse:
+        if ("info","error","warning","success") does not contain expr-2:
+            stop
+        continue
+    get:
+        set {_content} to expr-1
+        set {_type} to expr-2
+        set {_vars::*} to expr-3 if expr-3 is set
+        set {_recipients::*} to expr-4
+
+        set {_prefix} to formatted "%{sys-colour::%{_level}%}%{@prefix}{cm}"
+    
+        if {_vars::1} is not set:
+            return formatted "%{_prefix}% %{_content}%"
+        
+        loop {_vars::*}:
+            replace "(%loop-index%)" with "%loop-value%{@cm}" in {_content}
+            replace "[%loop-index%]" with "{@ca}%loop-value%{@cm}" in {_content}
+            replace "{%loop-index%}" with """{@ca}%loop-value%{@cm}""" in {_content}
+        
+        return formatted "%{_prefix}% %{_content}%" 
+
+
+        
