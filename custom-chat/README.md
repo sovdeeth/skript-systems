@@ -10,6 +10,7 @@ The nickname and dot have a tooltip with username, nickname, and rank informatio
 The chat message has a tooltip with sender info, message type info, a timestamp, and the number of players that saw the message. Clicking it will paste the message text into your chat box.
 
 **Colour and Custom Formatting**
+
 Each player can have a custom name colour and custom text colour. By default, everyone uses the same default colour. It's up to you to decide how to change players' colours. They're stored under ``{chat::%player%::name-colour}`` and ``{chat::%player%::chat-colour}``. Additionally, the rank/role a player has determines their dot colour. By default there's only a default and a staff colour, for players with ``{chat::staff::%player%}`` set. Again, it's up to you to customize this. 
 Players can choose to only see chat in the default chat-colour by using the ``/chat-monochrome`` command. They can also mute chat by typing ``/chat-quiet``.
 
@@ -32,12 +33,14 @@ replace all "$r" with formatted "<chatcolour>" in {_message}
 ```
 
 **Local Chat**
+
 Finally, there's also a local chat system where messages are only sent to other players in a certain radius of the sender. To turn this on, a player must type ``/lc <radius>``, where the radius is between 1 and 100. Turning it off is simply another ``/lc``. While messages are limited is sending radius, the player will still receive global messages. They can send individual global messages by including ``@a`` in their message.
 
 You 
 
 
 **Triggering chat redirects**
+
 You can tell the chat skript to treat the next chat message from a player as an input, and it will store it in a variable for you to access instead of sending it as a chat message. 
 
 Example code:
