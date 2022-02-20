@@ -1,0 +1,7 @@
+on load:
+    set {colour::main} to "&7"
+    set {colour::accent} to "&f"
+    set {colour::info} to "&7"
+    set {colour::warning} to "&c"
+    set {colour::error} to "&4"
+    set {colour::success} to "&2"

@@ -1,0 +1,44 @@
+# How to use:
+
+# send sm("info","here's the info about [1]: {2}",({_player},{_info})) to player
+# objects included at the end are auto-inserted into the string with proper color formatting
+# sm simply returns a formatted string. Some text features like <run command> or similar <> will need you to say 'send formmated sm()',
+# but normally you won't need to.
+
+# you can use sm(), sysMsg(), or systemMessage()
+
+# (1) inserts with no accent, no quotes
+# [1] inserts with accent, but no quotes
+# {1} inserts with accent and quotes
+
+options:
+    cm: %{colour::main}%
+    ca: %{colour::accent}%
+    prefix: [!]
+
+
+function systemMessage(level: text, msg: text, inputs: objects = "none") :: string:
+    set {_prefix} to formatted "%{colour::%{_level}%}%{@prefix}{@cm}"
+    
+    if {_inputs::1} is "none":
+        return formatted "%{_prefix}% %{_msg}%"
+    
+    loop {_inputs::*}:
+        replace "(%loop-index%)" with "%loop-value%{@cm}" in {_msg}
+        replace "[%loop-index%]" with "{@ca}%loop-value%{@cm}" in {_msg}
+        replace "{%loop-index%}" with """{@ca}%loop-value%{@cm}""" in {_msg}
+    
+    return formatted "%{_prefix}% %{_msg}%"
+
+
+function sysMsg(l: text, m: text, i: objects = "none") :: string:
+    return systemMessage({_l}, {_m}, {_i::*})
+    
+function sm(l: text, m: text, i: objects = "none") :: string:
+    return systemMessage({_l}, {_m}, {_i::*})
+    
+command /systemMessageExample:
+    permission: server.admin
+    trigger:
+        send systemMessage("info","[1]'s nickname is {2}.", (player, "Sovde"))
+        

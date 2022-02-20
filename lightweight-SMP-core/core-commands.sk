@@ -1,0 +1,35 @@
+function setGamemode(e: player, p: player, g: gamemode):
+    set {_p}'s gamemode to {_g} #Change gamemode of specified player
+    if {staff::modmode::%{_e}%} is false: #Test for modmode
+        send sm("warning","[1] Please enter moderator mode before using moderator commands.",("You are not in moderator mode.")) to {_e} #Sends a warning about modmode, but allows command to execute
+    send sm("success","Gamemode of [1] updated to [2].",({_p}, {_g})) to {_e} #sends confirmation
+    play sound "block.note_block.bell" with pitch 1.4 to {_e}
+    if {staff::hidden::*} contains {_p}:
+        make {_p} execute command "/dynmap hide"
+
+# Gamemode commands
+
+command /gamemode <gamemode> <player=%player%>:
+    permission: server.admin
+    trigger:
+        setGamemode(player, arg 2, arg 1)
+
+command /gmc <player=%player%>:
+    permission: server.admin
+    trigger:
+        make player execute command "/gamemode creative %arg 1%"
+
+command /gms <player=%player%>:
+    permission: server.admin
+    trigger:
+        make player execute command "/gamemode survival %arg 1%"
+
+command /gma <player=%player%>:
+    permission: server.admin
+    trigger:
+        make player execute command "/gamemode adventure %arg 1%"
+
+command /gmsp <player=%player%>:
+    permission: server.admin
+    trigger:
+        make player execute command "/gamemode spectator %arg 1%"
