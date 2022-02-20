@@ -1,35 +1,129 @@
-function setGamemode(e: player, p: player, g: gamemode):
-    set {_p}'s gamemode to {_g} #Change gamemode of specified player
-    if {staff::modmode::%{_e}%} is false: #Test for modmode
-        send sm("warning","[1] Please enter moderator mode before using moderator commands.",("You are not in moderator mode.")) to {_e} #Sends a warning about modmode, but allows command to execute
-    send sm("success","Gamemode of [1] updated to [2].",({_p}, {_g})) to {_e} #sends confirmation
-    play sound "block.note_block.bell" with pitch 1.4 to {_e}
-    if {staff::hidden::*} contains {_p}:
-        make {_p} execute command "/dynmap hide"
-
 # Gamemode commands
 
+function setGamemode(e: player, p: player, g: gamemode):
+
+    set {_p}'s gamemode to {_g} #Change gamemode of specified player
+
+    send sm("success","Gamemode of [1] updated to [2].",({_p}, {_g})) to {_e} #sends confirmation
+    play sound "block.note_block.bell" with pitch 1.4 to {_e}
+
 command /gamemode <gamemode> <player=%player%>:
-    permission: server.admin
+    permission: core.admin
     trigger:
         setGamemode(player, arg 2, arg 1)
 
 command /gmc <player=%player%>:
-    permission: server.admin
+    permission: core.admin
     trigger:
         make player execute command "/gamemode creative %arg 1%"
 
 command /gms <player=%player%>:
-    permission: server.admin
+    permission: core.admin
     trigger:
         make player execute command "/gamemode survival %arg 1%"
 
 command /gma <player=%player%>:
-    permission: server.admin
+    permission: core.admin
     trigger:
         make player execute command "/gamemode adventure %arg 1%"
 
 command /gmsp <player=%player%>:
-    permission: server.admin
+    permission: core.admin
     trigger:
         make player execute command "/gamemode spectator %arg 1%"
+
+
+#------- Item Editing -------
+
+command /enchant <text> <integer=1>:
+    permission: core.admin
+    usage: /enchant <enchantment name> [level]
+    trigger:
+        set {_enchantment} to "%arg 1% %arg 2%" parsed as enchantment type #finds correct enchantment using the arguments and stores it in a variable
+        enchant player's tool with {_enchantment} #enchants the held tool
+        send sm("success","Enchanted your [1] with [2].",(player's tool, {_enchantmnent})) #confirmation
+
+
+
+command /nbt <text> <text>: #allows changing of name and lore of items
+    permission: core.admin
+    usage: /nbt name <name> or /nbt lore <lore>. Use || to make newlines in lore. /nbt lore clear will remove all lore.
+    trigger:
+        if arg 1 is "name": # /nbt name ___
+            set name of player's tool to formatted arg 2
+
+        else if arg 1 is "lore": # /nbt lore ___
+            if arg 2 is "clear":
+                clear lore of player's tool
+                stop
+
+            if arg 2 contains "||":                                 # Looks for || to indicate a new line
+                set {_lore::*} to arg 2 split at "||"               # Separates the lines and store them in a list
+                set lore of player's tool to formatted {_lore::*}   # sets lore to that list, each item on a new line
+            else:
+                set lore of player's tool to colored arg 2          # Sets lore if no present || 
+
+
+#------- Misc -------
+
+command /ip <player>:
+    permission: core.admin
+    trigger:
+        send sm("info","[1]'s IP is {2}.", (arg-1, ip of arg-1))
+
+command /uuid <player>:
+    permission: core.admin
+    trigger:
+        send sm("info","[1]'s UUID is {2}.", (arg-1, uuid of arg-1))
+
+command /repair:
+    permission: core.admin
+    trigger:
+        repair player's tool
+
+command /fly:
+    permission: core.admin
+    trigger:
+        set fly state of player to true
+
+command /mount: 
+    permission: core.admin
+    trigger:
+        make player mount target entity
+
+command /playtime <offline player=%player%>:
+    permission: core.admin
+    trigger:
+        send sm("info","[1]'s play time is [2].", (arg-1, arg-1's time played))
+
+command /seen <offline player>:
+    permission: core.admin
+    trigger:
+        if arg-1 is online:
+            send sm("info","[1] is currently online.", (arg-1))
+        else:
+            send sm("info","[1] was last seen [2] ago.", (arg-1, difference between {core::last-seen::%arg-1%} and now))
+on quit:
+    set {core::last-seen::%player%} to now
+
+command /ping <player=%player%>:
+    trigger:
+        if arg 1 is not player:
+            if player does not have permission "core.admin":
+                send sm("error","You don't have permission to view others' ping.")
+                stop
+                
+        send sm("info","[1]'s ping is [2].",(arg-1, "%arg-1's ping%ms"))
+        set {_tps} to tps from last 1 minute
+        if {_tps} is greater than 19.99:
+            send sm("info","Server performance appears to be [1]",("PERFECT"))
+        else if {_tps} is between 19 and 19.98:
+            send sm("info","Server performance appears to be [1]",("GOOD"))
+        else if {_tps} is between 16 and 18.99:
+            send sm("info","Server performance appears to be [1]",("FINE"))
+        else if {_tps} is between  12 and 15.99:
+            send sm("info","Server performance appears to be [1]",("POOR"))
+        else if {_tps} is between 0 and 11.99:
+            send sm("info","Server performance appears to be [1]",("STRUGGLING"))
+        else:
+            send sm("info","Server performance appears to be [1]",("UNKNOWN"))

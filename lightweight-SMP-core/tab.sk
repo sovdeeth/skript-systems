@@ -1,0 +1,20 @@
+# Tablist
+
+options:
+    header: "%{colour::main}% - %{colour::accent}%Server Name%{colour::main}% - "
+    footer: "%{colour::main}% - %{colour::accent}%%{_online}% players%{colour::main}% - %nl% %{colour::main}%- %{colour::accent}%%{_now::2}%%{_now::3} in lowercase% est %{colour::main}%- "
+
+function tabHeader():
+    set {_online} to size of all players
+    set {_now::*} to "%now%" split at " "
+    set tab list header of all players to {@header}
+    set tab list footer of all players to {@footer}
+
+on join:
+    wait 1 tick
+    tabHeader()
+on quit:
+    tabHeader()
+
+every minute:
+    tabHeader()

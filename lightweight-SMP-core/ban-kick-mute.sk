@@ -1,0 +1,189 @@
+import:
+    org.apache.commons.lang3.StringUtils
+
+options:
+    cm: %{colour::main}%
+    ca: %{colour::accent}%
+
+# ------ bans ------
+
+command /ban <offline player> <text>:
+    permission: core.admin
+    aliases: /permaban
+    trigger:
+        if arg 1 is banned: 
+            send sm("error","That player is already banned. ({1})",(arg-1))
+        else:
+        
+            ban arg 1 due to "&f%arg 2%"
+            kick arg 1 due to "&f%arg 2%"
+            
+            if player is not set:
+                set {_sender} to "Server"
+            else:
+                set {_sender} to player
+            
+            send sm("warning","[1] has permanently banned [2] for [3].",({_sender}, arg-1, arg-2)) to all players where [input has permission "core.admin"]
+            add "Permaban | %{_sender}% | %now% | %arg-2%" to {core::punishment-log::%arg 1%::*}
+                    
+
+command /tempban <offline player> <integer> <text>:
+    permission: core.admin
+    aliases: /tban
+    trigger:
+        if arg 1 is banned:
+            send sm("error","That player is already banned. ({1})",(arg-1))
+        else:
+            set {_a} to "%arg 2% minutes" parsed as time span
+            ban arg 1 due to "&fBanned for %{_a}%&f: &f%arg 2%" for {_a}
+            kick arg 1 due to "&fBanned for %{_a}%&f: &f%arg 3%"
+            
+            if player is not set:
+                set {_sender} to "Server"
+            else:
+                set {_sender} to player
+
+            send sm("warning","[1] has temporarily banned [2] for [3].",({_sender}, arg-1, arg-3)) to all players where [input has permission "core.admin"]
+            add "Tempban | %{_sender}% | %now% | %arg-3% | %{_a}%" to {core::punishment-log::%arg 1%::*}
+
+
+command /pardon <offline player>:
+    permission: core.admin
+    aliases: /unban
+    trigger:
+        if arg 1 is not banned:
+            send sm("error","That player is not banned. ({1})",(arg-1))
+        else:
+
+            unban arg 1
+            send sm("success","[1] has unbanned [2].",(player, arg-1)) to all players where [input has permission "core.admin"]
+            add "Unban | %sender% | %now%" to {core::punishment-log::%arg 1%::*}
+
+# ------ kick ------
+
+command /kick <offline player> <text>:
+    permission: core.admin
+    trigger:
+        if arg 1 is "@a" or "all":
+            kick all players due to arg 2
+        else:
+            set {_player} to arg 1
+            if arg 1 is not online:
+                send sm("error","That player is not online. ({1})", (arg-1))
+            else:
+                kick arg 1 due to arg 2
+                send sm("warning","[1] has kicked [2] for [3].",({_sender}, arg-1, arg-2)) to all players where [input has permission "core.admin"]
+                add "Kick | %sender% | %now% | %arg-2%" to {core::punishment-log::%arg 1%::*}
+
+
+# ------ mute ------
+
+command /mute <offline player> <text>:
+    permission: core.admin
+    usage: /mute [player] [reason]
+    trigger:
+        if {chat::muted::%arg 1%} is not set:
+            set {chat::muted::%arg 1%} to now
+            add "Mute | %sender% | %now% | %arg-2%" to {core::punishment-log::%arg 1%::*}
+            send sm("warning","You have been muted for the following reason: [1].",(arg-2)) to arg 1
+            send sm("info","[1] has muted [2] for [3].", (player, arg-1, arg-2)) to all players where [input has permission "core.admin"]
+        else:
+            send sm("error","That person is already muted. ({1})", (arg-1))
+            
+command /unmute <offline player>:
+    permission: core.admin
+    trigger:
+        if {chat::muted::%arg 1%} is set:
+            delete {chat::muted::%arg 1%}
+            add "Unmute | %sender% | %now%" to {core::punishment-log::%arg 1%::*}
+            send sm("info","You have been unmuted.") to arg 1   
+            send sm("info","[1] has unmuted [2].", (player, arg-1)) to all players where [input has permission "core.admin"]
+        else:
+            send sm("error","That person is not muted. ({1})", (arg-1))
+
+options:
+    perma: <##ff5554>
+    temp: <##ff882c>
+    unban: <##44cc4a>
+    kick: <##dddd3e>
+    mute: <##666667>
+    unmute: <##aaaaaa>
+
+# ----- punishment log -----
+command /punishments <player> [<integer=1>]:
+    permission: core.admin
+    aliases: /ban-history
+    trigger:
+        if size of {core::punishment-log::%arg 1%::*} is 0:
+            send sm("error", "[1] has no punishments yet.", (arg-1))
+            stop
+        
+        set {_punishment-list::*} to reversed {core::punishment-log::%arg 1%::*}
+
+        set {_page} to arg-2
+        set {_total-pages} to ceil(size of {_punishment-list::*} / 10)
+        set {_start-index} to ({_page}-1)*10
+        set {_display-count} to min(10, size of {_punishment-list::*} - {_start-index})
+
+        send sm("info","-------- [1]'s Punishment History (%{_page}%/%{_total-pages}%) ---------", (arg-1))
+        send sm("info","(1) - (2) - (3) - (4)",(padText(" Type", 9, true), padText("Staff",14, true), padText(" Date",12, true), "    Reason"))
+        loop {_display-count} times:
+            set {_punishment::*} to {_punishment-list::%{_start-index}+loop-value%} split at " | "
+            set {_punishment::3} to first element of ({_punishment::3} split at ", " )
+
+            if (length of {_punishment::4}) is greater than 18:
+                set {_punishment::4} to subtext of {_punishment::4} from 1 to min(length of {_punishment::4}, 15)
+                set {_punishment::4} to "%{_punishment::4}%..."
+            set {_punishment::4} to "%{_punishment::4}%" if {_punishment::4} is set else ""
+
+            set {_punishment::1} to "{@perma}Perma" if {_punishment::1} is "Permaban" 
+            set {_punishment::1} to "{@temp}Temp" if {_punishment::1} is "Tempban" 
+            set {_punishment::1} to "{@unban}Unban" if {_punishment::1} is "Unban" 
+            set {_punishment::1} to "{@kick}Kick" if {_punishment::1} is "Kick"
+            set {_punishment::1} to "{@mute}Mute" if {_punishment::1} is "Mute" 
+            set {_punishment::1} to "{@unmute}Unmute" if {_punishment::1} is "Unmute"  
+            
+            set {_punishment::1} to padText({_punishment::1}, 9)
+            if stringWidth({_punishment::2}) > 28:
+                set {_punishment::2} to subtext of {_punishment::2} from 1 to 9
+                set {_punishment::2} to "%{_punishment::2}%.."
+            set {_punishment::2} to padText({_punishment::2}, 14)
+            set {_punishment::3} to padText({_punishment::3}, 12)
+            
+            send sm("info","[1] - [2] - [3] - [4]",{_punishment::*})
+        set {_prev} to "<cmd:/punishments %arg-1% %{_page}-1%>< Previous" if {_start-index} > 0 else "             "
+        set {_next} to "<cmd:/punishments %arg-1% %{_page}+1%>Next >" if {_total-pages} > {_page} else "    "
+        send formatted sm("info", padText("[1] | [2]",45,true),({_prev}, {_next}))
+
+
+
+
+
+function padText(string: string, width: integer, center: boolean=false) :: string:
+    set {_s} to uncoloured {_string}
+    set {_s-width} to stringWidth({_s})
+
+    set {_spaces} to {_s-width}/2
+    set {_padding} to round({_width} - {_spaces})
+
+    if {_center} is true:
+        set {_padding} to {_padding}/2
+        set {_m} to mod({_padding},1)
+        if {_m} > 0.5:
+            set {_string} to "%{_string}% "
+        loop {_padding} times:
+            set {_string} to " %{_string}%"
+
+    loop {_padding} times:
+        set {_string} to "%{_string}% "
+
+    return {_string}
+    
+function stringWidth(s: string) :: number:
+    set {_s-width} to length of {_s}*3
+    loop {_s} split at "":
+        if loop-value matches "[fkltI ]":
+            add -1 to {_s-width}
+        if loop-value matches "[i'.,]":
+            add -2 to {_s-width}
+    return {_s-width}
