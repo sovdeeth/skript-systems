@@ -28,7 +28,7 @@ function broadcastMarkedAFK(player: player):
 function broadcastUnmarksAFK(player: player):
     send sm("info","&o%{_player}% {@cm}&ois no longer marked as AFK.") to all players
 
-function un-afk(player: player):
+function unafk(player: player):
     delete {core::afk::%{_player}%} #removes afk state
     broadcastUnmarksAFK({_player})
     remove blindness from {_player}
@@ -45,23 +45,22 @@ command /afk [<text>]:
             wait 2 ticks
             if arg 1 is not "-b": #allows afk without blindness
                 apply blindness 1 without particles to player for 1 day
-            setTabName(player) #update tab color
             wait 33 ticks #delay to prevent de-afking I assume
             set {core::afk::%player%} to 1 #set state as afk
         else: #if already afk
             stop
-on any movement: #de-afk on movement, but don't update last-action
+on player move: #de-afk on movement, but don't update last-action
     if {core::afk::%player%} is set: #only runs on afk players
-        un-afk(player)
+        unafk(player)
 on chat:
     if {core::afk::%player%} is set: #only runs on afk players
-        un-afk(player)
+        unafk(player)
                 
 on command:
     if {core::afk::%player%} is set: #only runs on afk players
-        un-afk(player)
+        unafk(player)
 on join:
-    if player has blindness:
+    if player's potion effects contains blindness:
         {core::afk::%player%} is set
         delete {core::afk::%{_player}%}
         remove blindness from player #removes blindness as it cannot be done 'on quit'
