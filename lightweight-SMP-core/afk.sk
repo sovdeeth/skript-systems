@@ -39,7 +39,7 @@ command /afk [<text>]:
         if {core::afk::%player%} is not set: #tests for not afk
             broadcastMarksAFK(player)
             send sm("warning","&oWe recommend logging out if you plan on going AFK for more than a few minutes.")
-            send sm("warning","&oYou will be kicked after 20 minutes of inactivity.")
+            send sm("warning","&oYou will be kicked after {@kick-time} of inactivity.")
             send sm("warning","&oMove, chat, or send a command to unmark yourself as AFK.")
             play sound "block.note_block.bell" with pitch 1.4 to player
             wait 2 ticks
@@ -60,7 +60,7 @@ on command:
     if {core::afk::%player%} is set: #only runs on afk players
         unafk(player)
 on join:
-    if player's potion effects contains blindness:
+    if "%player's potion effects%" contains "blindness":
         {core::afk::%player%} is set
         delete {core::afk::%{_player}%}
         remove blindness from player #removes blindness as it cannot be done 'on quit'
