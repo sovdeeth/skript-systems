@@ -80,6 +80,11 @@ on chat:
         set {chat::redirect::%player%::message} to message
         clear {chat::redirect::%player%}
         stop
+
+    # check for staff chat toggle
+    if {chat::%player%::staff} is "on":
+        make player execute "/staff %message%"
+        stop
     
     chat(player, message)
 
@@ -151,7 +156,7 @@ function chat(sender: player, message: text, type: string = "standard"):
 
 on join:
     set {chat::%player%::name-colour} to "{@default-name-colour}" if {chat::%player%::name-colour} is not set
-    if player has permission "server.staff":
+    if player has permission "core.staff":
         add player to {staff::*} if {staff::*} doesn't contain player
 
     set join message to ""
@@ -161,3 +166,18 @@ on leave:
     set quit message to ""
     send formatted " &c←%{chat::%player%::name-colour}%&o %player%&7&o has {@ca}&oleft &7&othe server." to all players
 
+
+
+# -- Staff Chat --
+options:
+    staff-chat-colour: &c
+
+command /staff [text]:
+    permission: core.admin
+    aliases: /s
+    trigger:
+        if arg-1 is not set:
+            set {chat::%player%::staff} to "on" if {chat::%player%::staff} is "off" else "off"
+            send sm("success","Toggled staff chat [1].", ({chat::%player%::staff}))
+        else:
+            send formatted "{@staff-chat-colour} • %player% {@staff-chat-colour}- %arg-1%" to {staff::*}

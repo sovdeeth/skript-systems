@@ -80,16 +80,31 @@ command /repair:
     permission: core.admin
     trigger:
         repair player's tool
+        send sm("success", "Repaired your tool.")
 
 command /fly:
     permission: core.admin
     trigger:
-        set fly state of player to true
+        set fly state of player to true if fly state of player is false else false
+        send sm("success", "Set your fly state to [1].",(fly state of player))
+
+command /heal [<player=%player%>]:
+    permission: core.admin
+    trigger:
+        heal arg-1
+        send sm("success", "Healed [1].",(arg-1))
+
+command /feed [<player=%player%>]:
+    permission: core.admin
+    trigger:
+        set arg-1's hunger to 20
+        send sm("success", "Fed [1].",(arg-1))
 
 command /mount: 
     permission: core.admin
     trigger:
         make player mount target entity
+        send sm("success","Mounted [1].", (target entity))
 
 command /playtime <offline player=%player%>:
     permission: core.admin
