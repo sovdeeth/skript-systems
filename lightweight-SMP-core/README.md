@@ -11,4 +11,9 @@ This will, when completed:
 Other skripts you might consider adding include:
 - my inventory backup system.
 - my /home system (WIP)
-- 
+
+
+TODO:
+- tab name updates, with nicknames/colour/afk
+- core-inspect reminder
+- rewrite afk system to be more understandable
