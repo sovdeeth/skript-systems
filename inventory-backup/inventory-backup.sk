@@ -28,7 +28,7 @@ on death of player:
     if {invrestore::abort} is true:
         stop
     # load player's log file
-    load yaml "{@directory}/%player%-deaths.yml" as "log"
+    load yaml "{@directory}/%player's uuid%-deaths.yml" as "log"
 
     # get death number
     if yaml path "deathcounter" in "log" does not exist:
@@ -66,7 +66,7 @@ command /invrestore <offline player> [<integer=1>]:
             send formatted "{@ce} Inventory Restore cannot store 0 or fewer deaths. %nl% Please set max-death-stored to at least 1." 
             stop
 
-        load yaml "{@directory}/%arg-1%-deaths.yml" as "%arg-1%-log"
+        load yaml "{@directory}/%arg-1's uuid%-deaths.yml" as "%arg-1%-log"
 
         deleteExtraBackups("%arg-1%-log")
 
