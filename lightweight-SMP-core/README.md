@@ -17,3 +17,4 @@ TODO:
 - tab name updates, with nicknames/colour/afk
 - core-inspect reminder
 - rewrite afk system to be more understandable
+- options-ify everything
