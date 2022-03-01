@@ -8,6 +8,17 @@ This will, when completed:
 - provide an afk system to flag inactive players and kick after a certain period.
 - remind you to install core-inspect. 
 
+TOOD
+- private messages
+- /report
+- rename /nbt to /item?
+- staff chat
+- /heal, /feed
+- /clear-chat
+- slightly more robust rank system
+- tab completes need skbee, but might bee worth adding
+
+
 Other skripts you might consider adding include:
 - my inventory backup system.
 - my /home system (WIP)

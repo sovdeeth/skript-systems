@@ -2,7 +2,16 @@ options:
     ca: %{colour::accent}%
     default-name-colour: &f
 
-    prefix-colour: %{_staff-colour}% # default has a staff and a default colour
+    # Message formats
+    # the message is composed of prefix followed by separator followed by message
+    # The default prefix is a coloured • followed by the player's name
+    # The default separator is a -
+    # A default message looks like " • Username - Message text"
+    
+    # By default the prefix and name coloured are computed per-player in the chat skript, so they are variables here. Be wary of changing these.
+    # Separator and text colour as always the same, so change those as much as you like.
+
+    prefix-colour: %{_prefix-colour}% 
     prefix: %{_prefix-tooltip}% • %{_name-colour}%%{_player-name}% 
 
     separator-colour: &7
@@ -13,7 +22,7 @@ options:
 
     /me-format: &7&o
 
-    # prefix colours
+    # prefix colours - change these to change the •'s colour
 
     staff-colour: &6
     default-colour: &7
@@ -106,7 +115,7 @@ function chat(sender: player, message: text, type: string = "standard"):
 
     # staff colours
 
-    set {_staff-colour} to "{@staff-colour}" if {staff::*} contains {_sender} else "{@default-colour}"
+    set {_prefix-colour} to "{@staff-colour}" if {staff::*} contains {_sender} else "{@default-colour}"
 
     # Formatting
 
