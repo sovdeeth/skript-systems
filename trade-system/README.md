@@ -1,6 +1,6 @@
 # trading
 
-**Requires: my system message system**
+**Requires: my system message skript**
 
 (i should switch to basic messages but i'm lazy)
 
