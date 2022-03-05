@@ -1,7 +1,7 @@
 # skript-systems
 Collection of useful systems in skript. 
 
-Most will come with a vanilla/minimal addon version and a skript-reflect version.
+Some will come with a vanilla/minimal addon version and a skript-reflect version.
 
 The skript-reflect version will generally use custom effects/expressions and take advantage of java classes and functions.
 The vanilla/minimal version will usually use functions with occasional commands. If skript-reflect is included in the minimal list, there will only be a single version, using skript reflect custom effects and expressions.
