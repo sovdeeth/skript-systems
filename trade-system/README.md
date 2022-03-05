@@ -10,3 +10,5 @@ The trade requires the acceptance of both parties and will reset acceptance if t
 To use it, simply use ``/trade <player>`` to send a trade request to a player. They can either click on the request or use ``/trade-accept`` to accept the request and open the trade gui.
 
 All trades are logged to ``Skript/logs/trade-history.log`` for moderation purposes.
+
+Inspired by Wynncraft trading GUI
