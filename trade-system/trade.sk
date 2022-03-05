@@ -1,0 +1,353 @@
+import:
+    org.bukkit.event.inventory.InventoryDragEvent
+
+options:
+    tpi: {-trade::%{_player}%::inv}
+    cm: %{colour::main}%
+    ca: %{colour::accent}%
+
+    trade-distance: 15
+
+
+
+# ------------------
+# Requesting trades
+# ------------------
+command /trade <player>:
+    trigger:
+        # prevent self-trade (it breaks everything)
+        if arg-1 is player:
+            send sm("error", "You can't trade with yourself!")
+            stop
+
+        # distance check
+        if distance between arg-1 and player is greater than {@trade-distance}:
+            send sm("error", "[1] is too far away! You must get closer to trade.",(arg-1)) 
+            stop
+
+        # if there's a pending request from this player, just hand it off to /trade-accept
+        if {-trade::%player%::requester} is arg-1:
+            make player execute command "/trade-accept"
+            stop
+
+        # If the recipient already has a request, abort
+        if {-trade::%arg-1%::requester} is set:
+            {-trade::%arg-1%::requester} is not player
+            send sm("error","[1] is considering a different request.",(arg-1))
+            stop
+
+        # If the player has a pending request to someone else, cancel that request
+        if {-trade::%player%::requestee} is set:
+            clear {-trade::%{-trade::%player%::requestee}%::requester}
+            send sm("warning","The trade request from [1] was cancelled.",(player)) to {-trade::%player%::requestee}
+            clear {-trade::%player%::requestee}
+
+        # set up variables for tracking who requested who
+        set {-trade::%player%::requestee} to arg-1
+        set {-trade::%arg-1%::requester} to player
+        # send messages
+        send sm("success", "Sent a trade request to [1].",(arg-1))
+        send formatted sm("info", "[1] would like to trade with you. <cmd:/trade-accept>[2] to accept.",(player, "Click here")) to arg-1
+
+        # time out, if the trade hasn't happened/been cancelled, send messages about timeouts
+        wait 30 seconds
+        if {-trade::%arg-1%::requester} is player:
+            clear {-trade::%arg-1%::requester}
+            send sm("warning","The trade request from [1] timed out.",(player)) to arg-1
+
+        if {-trade::%player%::requestee} is arg-1:
+            clear {-trade::%player%::requestee}
+            send sm("warning","The trade request to [1] timed out.",(arg-1))
+
+
+
+# ----------------
+# Accepting trades
+# ----------------
+command /trade-accept:
+    trigger:
+        # check for valid request variables
+        if {-trade::%player%::requester} is not set:
+            send sm("error", "The last trade request timed out!")
+            stop
+        set {_partner} to {-trade::%player%::requester}
+        if {-trade::%{_partner}%::requestee} is not player:
+            send sm("error", "The last trade request timed out!")
+            stop
+
+        # distance check again
+        if distance between {_partner} and player is greater than {@trade-distance}:
+            send sm("error", "[1] is too far away! You must get closer to trade.",({_partner})) 
+            stop
+
+        # clear all remaining variable to prepare for trade
+        clear {-trade::%player%::*}
+        clear {-trade::%{_partner}%::*}
+
+        # open the GUIs
+        openTradeGUI(player, {_partner})
+        openTradeGUI({_partner}, player)
+
+
+
+# -----------------
+# Trading GUI Setup
+# -----------------
+function openTradeGUI(player: player, partner: player):
+    # setup partner/active trade variables
+    set {-trade::%{_player}%::partner} to {_partner}
+    set {-trade::%{_player}%::active} to true
+
+    # inventory name and central line of panes 
+    set {@tpi} to chest inventory with 3 rows named formatted  "{@cm}You                  %{_partner}%"
+    set slot 4 of {@tpi} to gray stained glass pane with lore "&8 " named " "
+    set slot 13 of {@tpi} to gray stained glass pane with lore "&8 " named " "
+    set slot 22 of {@tpi} to gray stained glass pane with lore "&8 " named " "
+
+    # player's confirmation marker
+    set slot 0 of {@tpi} to yellow stained glass pane with lore "&8 &7 " named "<yellow>Confirm Trade"
+
+    # partner's confirmation marker
+    set slot 5 of {@tpi} to yellow stained glass pane with lore "&8 " named "<yellow>Waiting for %{_partner}%"
+    
+    # open gui and update it to setup variables
+    open {@tpi} to {_player}
+    tradeUpdate({_player})
+
+
+
+# ----------------
+# Handling clicks
+# &8 - can't move it 
+# &7 - confirmation 
+# &6 - accept trade
+# ----------------
+on inventory click:
+    set {_player} to player
+    
+    
+    if event-inventory is {@tpi}:
+        if "%event-item's lore%" contains "&7 ":
+            tradeMarkConfirmed(player)
+            cancel event
+            stop
+
+        if "%event-item's lore%" contains "&6 ":
+            tradeAttemptComplete(player)
+            cancel event
+            stop
+
+        if "%event-item's lore%" contains "&8 ":
+            cancel event
+            stop
+
+        # if the item is in the player's side of the GUI, allow the event and trigger an update
+        if mod(index of event-slot, 9) < 4:
+            wait 1 tick
+            tradeUpdate(player)
+        else:
+            cancel event
+
+    # handle the shift clicks
+    # essentially, cancel the event, check if there's space in the list of items to add the blocks, then move them manually if there is
+    if event-inventory is player's inventory:
+        player's open inventory is {@tpi}
+        if "%click type%" contains "shift":
+            cancel event
+            # loop the player's slots in the gui
+            loop {-trade::%player%::items::*}:
+                # if the slot contains the same item
+                if 1 of loop-value is 1 of event-item:
+                    # get the two amounts
+                    set {_a} to item amount of loop-value
+                    set {_b} to item amount of event-item
+                    # ensure they add up to less than 64 (or whatever their max stack size is)
+                    if max stack size of event-item - {_a} >= {_b}:
+                        # manually move the item to the right slot, replace it with air
+                        set {_s} to (loop-index parsed as number)
+                        set slot {_s} of {@tpi} to ({_a} + {_b}) of event-item
+                        set event-slot to air
+                        # trigger gui update
+                        tradeUpdate(player)
+                        stop
+                # if the slot contains air
+                if loop-value is air:
+                    # add item to list
+                    set {-trade::%player%::items::%loop-index%} to event-item
+                    # manually move item
+                    set {_s} to (loop-index parsed as number)
+                    set slot {_s} of {@tpi} to event-item
+                    set event-slot to air
+                    # trigger gui update
+                    tradeUpdate(player)
+                    exit loop
+
+# prevents drags from affecting the inventory
+# not worth making them work
+on InventoryDragEvent:
+    set {_player} to event.getWhoClicked()
+    if event.getInventory() is {@tpi}:
+        cancel event
+
+
+
+# -------------------
+# Trade Confirmation
+# -------------------
+function tradeMarkConfirmed(player: player):
+    # mark player confirmation
+    set slot 0 of {@tpi} to lime stained glass pane with lore "&8 &6 " named "<lime>Trade Confirmed"
+    set {-trade::%{_player}%::confirmed} to true
+    play sound "block.note_block.bell" with pitch 1.2 to {_player}
+
+    # update parter's gui too
+    set {_partner} to {-trade::%{_player}%::partner}
+    set slot 5 of {-trade::%{_partner}%::inv} to lime stained glass pane with lore "&8 " named "<lime>Trade Confirmed"
+    play sound "block.note_block.bell" with pitch 1.2 to {_partner}
+
+
+function tradeMarkUnconfirmed(player: player):
+    # mark player confirmation
+    set slot 0 of {@tpi} to yellow stained glass pane with lore "&8 &7 " named "<yellow>Confirm Trade"
+    # only ding if they were previously confirmed
+    if {-trade::%{_player}%::confirmed} is true:
+        play sound "block.note_block.bell" with pitch 0.8 to {_player}
+        play sound "block.note_block.bell" with pitch 0.8 to {_partner}
+    set {-trade::%{_player}%::confirmed} to false
+
+    # update parter's gui too
+    set {_partner} to {-trade::%{_player}%::partner}
+    set slot 5 of {-trade::%{_partner}%::inv} to yellow stained glass pane with lore "&8 " named "<yellow>Waiting for %{_player}%"
+    
+
+
+# -----------------
+# Trade Completion
+# -----------------
+function tradeAttemptComplete(player: player):
+    set {_partner} to {-trade::%{_player}%::partner}
+
+    # ensure both players have confirmed
+    if {-trade::%{_player}%::confirmed} is not true:
+        stop
+    if {-trade::%{_partner}%::confirmed} is not true:
+        tradeMarkUnconfirmed({_player})
+        stop
+
+    # just make sure the partners are both trading with each other (shouldn't be needed, but better safe than sorry)
+    if {-trade::%{_partner}%::partner} is not {_player}:
+        stop
+
+    # make sure the trade has only happened once
+    if {-trade::%{_partner}%::complete} is true:
+        stop
+    
+    set {-trade::%{_player}%::complete} to true
+
+    # give player items
+    if {_player} can hold {-trade::%{_partner}%::items::*}:
+        give {_player} {-trade::%{_partner}%::items::*}
+    else:
+        drop {-trade::%{_partner}%::items::*} at {_player}
+
+    # give partner items
+    if {_partner} can hold {-trade::%{_player}%::items::*}:
+        give {_partner} {-trade::%{_player}%::items::*}
+    else:
+        drop {-trade::%{_player}%::items::*} at {_partner}
+
+    # record trade
+    recordTrade({_player}, {_partner}, {-trade::%{_player}%::items::*}, {-trade::%{_partner}%::items::*})
+
+    # confirmation messages
+    send sm("success", "Your trade with [1] was successful!",({_partner})) to {_player}
+    send sm("success", "Your trade with [1] was successful!",({_player})) to {_partner}
+    play sound "block.note_block.bell" with pitch 1.4 to {_player}
+    play sound "block.note_block.bell" with pitch 1.4 to {_partner}
+
+    # close inventories
+    clear {-trade::%{_player}%::active}
+    clear {-trade::%{_partner}%::active}
+
+    close {_player}'s inventory
+    close {_partner}'s inventory
+
+    # clear all trade data after a short delay
+    wait 5 ticks
+    clear {-trade::%{_partner}%::*}
+    clear {-trade::%{_player}%::*}
+
+
+
+# -----------------
+# Trade GUI Updates
+# -----------------
+function tradeUpdate(player: player, reset: boolean=true):
+    # loop the slots the player can edit
+    set {_slot} to 1
+    loop 11 times:
+        # skip over the right-side slots
+        if mod({_slot},9) > 3:
+            add 5 to {_slot}
+        # write the slot in the list variable
+        set {-trade::%{_player}%::items::%{_slot}%} to slot {_slot} of {@tpi}
+        add 1 to {_slot}
+    
+
+    set {_partner} to {-trade::%{_player}%::partner}
+
+    # reset confirmation
+    if {_reset} is true:
+        tradeMarkUnconfirmed({_player})
+        tradeMarkUnconfirmed({_partner})
+
+    # update partner gui items
+    loop {-trade::%{_player}%::items::*}:
+        set {_slot} to loop-index parsed as number
+        set slot {_slot} + 5 of {-trade::%{_partner}%::inv} to loop-value
+
+
+
+# -------------------
+# Trade Cancellation
+# -------------------
+on inventory close:
+    if {-trade::%player%::active} is set:
+        tradeCancel(player)
+
+function tradeCancel(player: player):
+    set {_partner} to {-trade::%{_player}%::partner}
+
+    # give player items
+    if {_player} can hold {-trade::%{_player}%::items::*}:
+        give {_player} {-trade::%{_player}%::items::*}
+    else:
+        drop {-trade::%{_player}%::items::*} at {_player}
+
+    # give partner items
+    if {_partner} can hold {-trade::%{_partner}%::items::*}:
+        give {_partner} {-trade::%{_partner}%::items::*}
+    else:
+        drop {-trade::%{_partner}%::items::*} at {_partner}
+
+    # confirmation messages
+    send sm("warning", "Your trade with [1] was cancelled!",({_partner})) to {_player}
+    send sm("warning", "Your trade with [1] was cancelled!",({_player})) to {_partner}
+    play sound "block.note_block.bell" with pitch 0.5 to {_player}
+    play sound "block.note_block.bell" with pitch 0.5 to {_partner}
+
+    # clear all trade data 
+    clear {-trade::%{_partner}%::*}
+    clear {-trade::%{_player}%::*}
+
+    close {_player}'s inventory
+    close {_partner}'s inventory
+
+
+
+# -------------
+# Trade History
+# -------------
+
+function recordTrade(player-1: player, player-2: player, p1-items: items, p2-items: items):
+    log "%{_player-1}% : %{_p1-items::*}% | %{_player-2}% : %{_p2-items::*}% " to "trade-history"
