@@ -1,0 +1,133 @@
+import:
+    com.sk89q.worldedit.WorldEdit
+    com.sk89q.worldedit.entity.Player
+    com.sk89q.worldedit.bukkit.BukkitAdapter
+    org.bukkit.command.CommandSender
+    org.bukkit.Particle
+    org.bukkit.Location
+    java.lang.Math
+
+on load:
+    set {we} to WorldEdit.getInstance().getSessionManager()
+
+command //cui:
+    permission: server.worldedit.cui
+    trigger:
+        set {we::%player's uuid%} to true if {we::%player's uuid%} is false else false
+        set {_s} to "&7Toggled World Edit Visualizer [1]."
+        replace all "[1]" with ("&aOn&7" if {we::%player's uuid%} is true else "&cOff&7") in {_s}
+        send {_s}
+        startCUI(player) if {we::%player's uuid%} is true 
+
+function startCUI(player: player):
+    set {_actor} to BukkitAdapter.adapt[CommandSender]({_player})
+    set {_session} to {we}.getIfPresent({_actor})
+
+    while {we::%{_player}'s uuid%} is true:
+        set {_selection} to try {_session}.getSelection(BukkitAdapter.adapt({_player}'s world))
+        if {_selection} is set:
+            if {_selection}'s class is class "com.sk89q.worldedit.regions.Polygonal2DRegion":
+                set {_vertices::*} to ...({_selection}.getPoints().toArray())
+                set {_max} to y coord of BukkitAdapter.adapt({_player}'s world, {_selection}.getMaximumPoint())
+                set {_min} to y coord of BukkitAdapter.adapt({_player}'s world, {_selection}.getMinimumPoint())
+                drawPoly2DCUI({_vertices::*}, {_max}, {_min}, {_player})
+            else if {_selection}'s class is class "com.sk89q.worldedit.regions.EllipsoidRegion":
+                drawEllipsoidCUI({_selection}.getRadius(), {_selection}.getCenter(), {_player})
+            else:
+                set {_pos1} to BukkitAdapter.adapt({_player}'s world, {_selection}.getBoundingBox().getPos1())
+                set {_pos2} to BukkitAdapter.adapt({_player}'s world, {_selection}.getBoundingBox().getPos2())
+                drawBoxCUI({_pos1}, {_pos2}, ({_player}))
+        wait 10 ticks
+        if {_player} is offline:
+            stop
+
+on join:
+    if {we::%player's uuid%} is not set:
+        set {we::%player's uuid%} to false
+    player has permission "server.worldedit.cui"
+    {we::%player's uuid%} is true
+    startCUI(player)
+
+function drawLineCUI(loc1: location, loc2: location, player: player):
+    set {_v} to vector from {_loc1} to {_loc2}
+    set vector length of {_v} to 0.25
+    set {_ploc} to {_loc1}
+    loop floor((distance between {_loc1} and {_loc2}) / (vector length of {_v})) times:
+        set {_ploc} to {_ploc} ~ {_v}
+        {_player}.spawnParticle[Particle, Location, int, double, double, double, double](Particle.FLAME, {_ploc}, 1, 0.0, 0.0, 0.0, 0.0)
+
+function drawBoxCUI(corner1: location, corner2: location, player: player):
+    set {_dx} to x coordinate of {_corner1} - x coordinate of {_corner2}
+    set {_dy} to y coordinate of {_corner1} - y coordinate of {_corner2}
+    set {_dz} to z coordinate of {_corner1} - z coordinate of {_corner2}
+
+    set {_corner1} to {_corner1} ~ vector(1, 0, 0) if {_dx} >= 0
+    set {_corner1} to {_corner1} ~ vector(0, 1, 0) if {_dy} >= 0
+    set {_corner1} to {_corner1} ~ vector(0, 0, 1) if {_dz} >= 0
+    set {_corner2} to {_corner2} ~ vector(1, 0, 0) if {_dx} < 0
+    set {_corner2} to {_corner2} ~ vector(0, 1, 0) if {_dy} < 0
+    set {_corner2} to {_corner2} ~ vector(0, 0, 1) if {_dz} < 0
+
+    set {_c1} to {_corner1}
+    set {_c2} to {_corner1}
+    set x coordinate of {_c2} to x coordinate of {_corner2}
+    set {_c3} to {_corner1}
+    set y coordinate of {_c3} to y coordinate of {_corner2}
+    set {_c4} to {_corner1}
+    set z coordinate of {_c4} to z coordinate of {_corner2}
+    set {_c5} to {_corner2}
+    set x coordinate of {_c5} to x coordinate of {_corner1}
+    set {_c6} to {_corner2}
+    set y coordinate of {_c6} to y coordinate of {_corner1}
+    set {_c7} to {_corner2}
+    set z coordinate of {_c7} to z coordinate of {_corner1}
+    set {_c8} to {_corner2}
+
+    drawLineCUI({_c1}, {_c2}, {_player})
+    drawLineCUI({_c1}, {_c3}, {_player})
+    drawLineCUI({_c1}, {_c4}, {_player})
+    drawLineCUI({_c8}, {_c5}, {_player})
+    drawLineCUI({_c8}, {_c6}, {_player})
+    drawLineCUI({_c8}, {_c7}, {_player})
+    drawLineCUI({_c2}, {_c7}, {_player})
+    drawLineCUI({_c3}, {_c7}, {_player})
+    drawLineCUI({_c3}, {_c5}, {_player})
+    drawLineCUI({_c4}, {_c5}, {_player})
+    drawLineCUI({_c4}, {_c6}, {_player})
+    drawLineCUI({_c2}, {_c6}, {_player})
+
+function drawPoly2DCUI(vertices: objects, max: number, min: number,  player: player):
+    add 1 to {_max}
+
+    loop {_vertices::*}:
+        drawLineCUI(BukkitAdapter.adapt({_player}'s world, loop-value.toBlockVector3({_max})), BukkitAdapter.adapt({_player}'s world, loop-value.toBlockVector3({_min})), {_player})
+
+    loop size of {_vertices::*} - 1 times:
+        drawLineCUI(BukkitAdapter.adapt({_player}'s world, {_vertices::%(loop-value)%}.toBlockVector3({_max})), BukkitAdapter.adapt({_player}'s world, {_vertices::%(loop-value + 1)%}.toBlockVector3({_max})), {_player})
+        drawLineCUI(BukkitAdapter.adapt({_player}'s world, {_vertices::%(loop-value)%}.toBlockVector3({_min})), BukkitAdapter.adapt({_player}'s world, {_vertices::%(loop-value + 1)%}.toBlockVector3({_min})), {_player})
+    drawLineCUI(BukkitAdapter.adapt({_player}'s world, (first element of {_vertices::*}).toBlockVector3({_min})), BukkitAdapter.adapt({_player}'s world, (last element of {_vertices::*}).toBlockVector3({_min})), {_player})
+    drawLineCUI(BukkitAdapter.adapt({_player}'s world, (first element of {_vertices::*}).toBlockVector3({_max})), BukkitAdapter.adapt({_player}'s world, (last element of {_vertices::*}).toBlockVector3({_max})), {_player})
+
+function drawEllipsoidCUI(radius: object, center: object, player: player):
+    set {_radius::*} to ({_radius}.getX()+0.3, {_radius}.getY()+0.3, {_radius}.getZ()+0.3)
+    set {_center} to location({_center}.getX()+0.5, {_center}.getY()+0.5, {_center}.getZ()+0.5, {_player}'s world)
+    drawEllipseCUI(({_radius::1}, {_radius::2}), 0, {_center}, {_player})
+    drawEllipseCUI(({_radius::3}, {_radius::2}), 1, {_center}, {_player})
+    drawEllipseCUI(({_radius::1}, {_radius::3}), 2, {_center}, {_player})
+
+
+function drawEllipseCUI(radius: numbers, orientation: number, center: location, player: player):
+    set {_scale} to 360/(max({_radius::1}, {_radius::2})*2*3.141592*2)
+    loop 360/{_scale} times:
+        set {_a} to {_radius::1} * Math.sin({_scale}*loop-value/180 * 3.141592)
+        set {_b} to {_radius::2} * Math.cos({_scale}*loop-value/180 * 3.141592)
+        set {_v} to vector({_a}, {_b}, 0) 
+        if {_orientation} is 1:
+            rotate {_v} around y-axis by 90
+        if {_orientation} is 2:
+            rotate {_v} around x-axis by 90 
+
+
+        set {_ploc} to {_center} ~ {_v}
+        {_player}.spawnParticle[Particle, Location, int, double, double, double, double](Particle.FLAME, {_ploc}, 1, 0.0, 0.0, 0.0, 0.0)
+
