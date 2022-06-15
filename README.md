@@ -8,4 +8,6 @@ The vanilla/minimal version will usually use functions with occasional commands.
 
 These are meant to be general, powerful skripts you can add to your server and take advantage of. Ideally you would edit the skripts to best suit your server, with more specific effects and parameters, as they are rather generic in their current form for that reason. They should all be plug and play.
 
+**Warning:** Many systems do not explicitly use `player's uuid` in variables. This is because I have my config set to automatically use uuids in variables. I suggest you do this too. 
+
 If you have advice/concerns/issues, message me on discord at Sovde#0001 and make it clear that you are messaging about my systems.
