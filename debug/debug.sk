@@ -1,0 +1,34 @@
+# Handles displaying custom skript debug messages
+# Contains:
+#   debugMessage()
+#   /debug-msgs
+
+options:
+    debug-color: %color("c44127")%
+
+
+effect debug [message] %objects%:
+    trigger:
+        send formatted "{@debug-color}[Debug] - &7%expr-1%" to (all players where [{debug::%input%} is true])
+        send formatted "{@debug-color}[Debug] - &7%expr-1%" to console
+        
+
+
+# back compatibility
+function debugMessage(msg: text):
+    debug {_msg}
+
+on tab complete of "/debug-msgs":
+    set tab completions for position 1 to "true", "false"
+
+command /debug-msgs <boolean=true>:
+    permission: server.debug
+    trigger:
+        if arg-1 is true:
+            set {debug::%player%} to true
+            sm("success","Debug messages are now [1].", ("shown"))
+        else if arg-1 is false:
+            set {debug::%player%} to false
+            sm("success","Debug messages are now [1].", ("hidden"))
+        else:
+            sm("error","Invalid argument, use [1].", ("/debug-msgs true/false"))

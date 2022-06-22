@@ -1,0 +1,120 @@
+# --- comment the on load out after first load. ---
+on load:
+    clear {parkour::*}
+    set {_length-limit::*} to (7, 6, 5, 4.6)
+    loop 4 times: # up-down
+        loop 9 times: # left-right
+            loop 5 times: # forward-back
+                set {_index} to (loop-value-1 - 1) * 45 + (loop-value-2 - 1) * 5 + loop-value-3
+                set {_v} to vector(loop-value-2 - 5, loop-value-1 - 3, loop-value-3)
+                if vector length of {_v} <= {_length-limit::%loop-value-1%}:
+                    set {parkour::all-possible-jumps::%{_index}%} to {_v} 
+                    vector length of {_v} > 1.42
+                    if loop-value-1 > 1:
+                        vector length of {_v} is between 2.6 and 4.5
+                        set {parkour::preferred-jumps::%{_index}%} to {_v} 
+                        continue
+                    set {parkour::other-jumps::%{_index}%} to {_v}
+                
+
+function distanceHeuristic(current: location, target: location) :: number:
+    set {_current-distance} to distance between {_current} and {_target}
+    set {_threshold-distance} to (distance between {parkour::start} and {_target}) * 3/4
+    set {_dist} to min({_current-distance}, {_threshold-distance})
+    set {_mod-dist} to {_dist} + (random number between 0 and 1) * {_dist}/1.5
+    return {_mod-dist}
+
+function checkValid(current: location, jump: vector, target: location) :: boolean:
+    set {_v} to vector from ({_current} ~ {_jump}) to {_target}
+    set {_xz2} to vector length of ({_v} ** vector(1,0,1)) 
+    set {_dydxz} to y component of {_v} / sqrt({_xz2})
+    if {_dydxz} < -1.5:
+        return false
+    if {_dydxz} > 0.9:
+        return false
+    if block at ({_current} ~ {_jump}) is not air:
+        return false
+
+    add blocks between {_current} and ({_current} ~ {_jump}) to {_blocks::*}
+    add blocks between {_current} ~ vector(0,1,0) and ({_current} ~ {_jump}) ~ vector(0,1,0) to {_blocks::*}
+    add blocks between {_current} ~ vector(0,2,0) and ({_current} ~ {_jump}) ~ vector(0,2,0) to {_blocks::*}
+    loop {_blocks::*}:
+        loop-value is not block at {_current}
+        if loop-value is not air:
+            return false
+    return true
+
+function checkFinish(current: location, target: location) :: boolean:
+    set {_v} to vector from {_current} to {_target}
+    if vector length of {_v} > 7:
+        return false
+    if y component of {_v} is not between -2.1 and 1.1:
+        return false
+    loop {parkour::all-possible-jumps::*}:
+        set {_v} to loop-value
+        loop 4 times:
+            rotate {_v} around y axis by 90
+            if location of block at ({_current} ~ {_v}) = location of block at {_target}:
+                return true
+    return false
+
+function generateParkour(start: location, end: location, block-type: material):
+    set {parkour::start} to {_start} if {parkour::start} is not set
+    set {_facing} to round(yaw of vector between {_start} and {_end} / 90)
+    set {_facing} to 0 if {_facing} is 4
+    set {_rotate-by} to {_facing} * -90
+
+    loop {parkour::preferred-jumps::*}:
+        set {_v} to loop-value
+        rotate {_v} around y axis by {_rotate-by}
+        set {_jumps::%loop-index%} to distanceHeuristic(({_start} ~ {_v}), {_end})
+
+    loop (size of {_jumps::*} / 6) times:
+        set {_index} to random element of (indices of {parkour::other-jumps::*})
+        set {_v} to {parkour::other-jumps::%{_index}%}
+        rotate {_v} around y axis by {_rotate-by}
+        set {_jumps::%{_index}%} to distanceHeuristic(({_start} ~ {_v}), {_end})
+
+    set {_jump-set::*} to (sorted indices of {_jumps::*} in ascending order)
+
+    if checkFinish({_start}, {_end}) is true:
+        broadcast "complete"
+        clear {parkour::start} 
+        stop
+    loop 4 times:
+        loop 2 times:
+            
+            loop {_jump-set::*}:
+                set {_jump} to {parkour::all-possible-jumps::%loop-value-3%}    
+                rotate {_jump} around y axis by {_rotate-by}
+                
+                if checkValid({_start}, {_jump}, {_end}) is true:
+                    exit 3 loops
+                remove {_jump} from {_jump-set::*}
+
+            if loop-value-2 is 1:
+                broadcast "failed to find preferred match, expanding search"
+                loop {parkour::all-possible-jumps::*}:
+                    set {_jumps::%loop-index%} to distanceHeuristic({_start}, {_end})
+                set {_jump-set::*} to (sorted indices of {_jumps::*} in ascending order)
+
+            else if loop-value-2 is 2:
+                broadcast "failed to find possible path, rotating."
+                add -90 to {_rotate-by}
+        clear {_jump}
+    if {_jump} is not set:
+        broadcast "failed to find path, aborting."
+        clear {parkour::start}
+        stop
+        
+    set block at ({_start} ~ {_jump}) to {_block-type} if block at ({_start} ~ {_jump}) is air
+    wait 0.5 seconds
+    if {abort} is set:
+        broadcast "aborted parkour"
+        clear {abort}
+        clear {parkour::start} 
+        stop
+    generateParkour(({_start} ~ {_jump}), {_end}, {_block-type})
+
+
+
