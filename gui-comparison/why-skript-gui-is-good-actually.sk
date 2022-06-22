@@ -1,0 +1,57 @@
+
+# Task:
+# Make a gui that allows the player to move their own inventory around, but not into the gui.
+
+# ----------------------------------------------------- #
+# skript-gui
+# ----------------------------------------------------- #
+
+command gui:
+    trigger:
+        create a gui with virtual chest inventory with 3 rows with shape "a-------a", "a---b---a", "a-------a":
+            # shapes are nice but vanilla guis has similar features too
+            format gui slot "a" with stick
+            # small nitpick about being able to shift-click into if the slot isn't filled with air
+            format gui slot "-" with air
+            # best feature, being able to see exactly what a item does when clicked
+            # no need to look elsewhere for information
+            format gui slot "b" with diamond:
+                give player 1 diamond
+                send "hello" to player
+        open last gui to player
+
+
+# ----------------------------------------------------- #
+# vanilla guis
+# ----------------------------------------------------- #
+
+command gui2:
+    trigger:
+        # being able to store them in variables/metadata is nice
+        set metadata value "gui" of player to chest inventory with 3 rows
+        # like shapes in skript-gui, but a little less intuitive. Gotta count slot indexes.
+        set slot (0,8,9,17,18,26) of metadata value "gui" of player to stick
+        # who knows what this item does? You have to go find the code in another event.
+        set slot 13 of metadata value "gui" of player to diamond
+        open metadata value "gui" of player to player
+
+# prevent interaction with gui but not with player's inventory
+on inventory click:
+    # handle normal clicks in inv and shift clicks out of inv
+    if event-inventory is metadata value "gui" of player:
+        cancel event
+        if event-slot is slot 13 of event-inventory:
+            give player 1 diamond
+            send "hello" to player
+    # prevent shift clicks into inv
+    if player's current inventory is metadata value "gui" of player:
+        if "%click type%" contains "shift":
+            cancel event
+
+# prevent drags into inv
+import:
+    org.bukkit.event.inventory.InventoryDragEvent
+
+on InventoryDragEvent:
+    if event.getInventory() is metadata value "gui" of event.getWhoClicked():
+        cancel event
