@@ -1,0 +1,57 @@
+# function
+# spawn a mob with the nbt {Pickpocket:1b} set
+# parameters: entitytype, location
+# returns: nothing
+function spawnPickpocket(entity: entity type, location: location):
+    spawn {_entity} at {_location}:
+        set metadata tag "Pickpocket" of entity to true
+
+    set {_entity} to last spawned entity
+    wait 2 ticks
+    # get nearest player with a loop
+    loop all players in world of {_location} where [(distance between input and {_entity}) <= 50]:
+        {_entity}.getPathfinder().moveTo(loop-value)
+        exit loop
+    
+    
+
+# when the damage event triggers, check if the attacker has the nbt {Pickpocket:1b}
+# if it does, then have a 20% chance to steal an item from the victim, and then run away
+on damage:
+    victim is a player
+    if metadata tag "Pickpocket" of attacker is true:
+        attacker's tool is air
+        chance of 20%:
+            set {_slot} to random number between 0 and 35
+            slot {_slot} of victim's inventory is not air
+            set attacker's tool to slot {_slot} of victim's inventory
+            set slot {_slot} of victim's inventory to air
+            pickpocketFlee(attacker, victim)
+            broadcast "stolen %attacker's tool% from %victim%!"
+
+function pickpocketFlee(thief: entity, victim: player):
+    set metadata tag "PickpocketFlee" of {_thief} to true
+    broadcast "fleeing"
+    while {_thief} is alive:
+        set {_v} to vector from {_victim} to {_thief}
+        set vector length of {_v} to 50
+        set {_targetLoc} to {_thief}'s location ~ {_v}
+        {_thief}.setTarget(null)
+        {_thief}.getPathfinder().moveTo({_targetLoc}, 1.05)
+        
+        wait 10 ticks
+        if {_victim} is not alive:
+            stop
+        if distance between {_thief} and {_victim} > 150:
+            stop
+
+# prevent entities with PickpocketFlee metadata from targetting other entities
+on target:
+    if metadata tag "PickpocketFlee" of entity is true:
+        cancel event
+    
+# on death, the pickpocket mob should always drop its tool
+on death:
+    if metadata tag "Pickpocket" of victim is true:
+        remove victim's tool from drops
+        drop victim's tool

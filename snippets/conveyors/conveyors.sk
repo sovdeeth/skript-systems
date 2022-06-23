@@ -1,0 +1,41 @@
+function createConveyorBeltItem(location: location, item: item):
+    # spawn the armor stand
+    spawn armor stand at {_location}:
+        set entity's helmet to {_item} # set item helmet
+        add "{Invisible:1b,Invulnerable:1b,Small:1b,Marker:1b}" to entity's nbt # all the nbt stuff
+
+    # store armor stand
+    set {_e} to last spawned entity 
+
+    # move it around!
+    # every second we tell it a new place to go to, and then move it using the moveSmoothly function
+    while {_e} is alive:
+        # check if it's on a conveyor
+        if block at {_e} is magenta glazed terracotta:
+            # get the direction of the block (in reverse, because minecraft can't be logical)
+            set {_v} to vector from (block (facing of block at {_e}) block at {_e}) to (block at {_e})
+            # make it move to the new block
+            moveSmoothly({_e}, {_e}'s location, {_e}'s location ~ {_v})
+
+        # kill it if it's not on a conveyor
+        else:
+            kill {_e}
+
+        # wait for movement to finish
+        wait 1 second
+
+
+# moves a entity from one location to the next, over 1 second.
+# teleports once per tick, 1/20th of the whole distance.
+function moveSmoothly(e: entity, start: location, end: location):
+    # get the distance
+    set {_v} to vector from {_start} to {_end}
+    # get increment of 1/20th
+    set {_increment} to vector length of {_v} / 20
+    # set initial length
+    set vector length of {_v} to {_increment}
+    # loop 20 times, each time we move 1/20th of the distance
+    loop 20 times:
+        teleport {_e} to {_start} ~ {_v} # teleport to the new location
+        wait 1 tick 
+        set vector length of {_v} to {_increment} + vector length of {_v} # increment the length

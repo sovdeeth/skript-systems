@@ -1,0 +1,54 @@
+import:
+    org.bukkit.Particle
+    org.bukkit.Location
+
+function drawParabola(vertex: location, point: location, player: player):
+    
+
+    if {parabola::%{_player}'s uuid%} is true:
+        set {parabola::%{_player}'s uuid%} to false
+        stop
+
+    set {parabola::%{_player}'s uuid%} to true 
+    set {_points::*} to getParabolaPoints({_vertex}, {_point})
+    while {parabola::%{_player}'s uuid%} is true:
+        # broadcast "test"
+        loop {_points::*}:
+            {_player}.spawnParticle[Particle, Location, int, double, double, double, double](Particle.FLAME, loop-value, 1, 0.0, 0.0, 0.0, 0.0)
+        wait 10 ticks
+
+    set {parabola::%{_player}'s uuid%} to false
+
+# this should return a list of points on the parabola defined by the vertex and the intercept.
+function getParabolaPoints(vertex: location, point: location) :: locations:
+    # set vertex as origin
+    # calculate a based on given point (k, h = 0)
+    # Translate given point into xz-distance and y-distance from origin
+    set {_point-vector} to vector from {_vertex} to {_point}
+    set {_v} to {_point-vector} ** vector(1, 0, 1)
+    set {_xz} to vector length of {_v}  
+    set {_y} to y component of {_point-vector}
+
+    # calculate a
+    set {_a} to {_y} / ({_xz}^2)
+
+
+    # calculate conversion back to world coordinates
+    set {_yaw} to yaw of {_point-vector}
+    set {_x-conversion} to sin({_yaw})
+    set {_z-conversion} to -1 * cos({_yaw})
+    
+    # calculate the points
+    loop 2 times:
+        loop 200 times:
+            set {_xz-temp} to {_xz} / 200 * loop-number-2 * (1 if loop-number-1 is 1 else -1)
+            set {_y} to {_a} * {_xz-temp}^2
+
+            # translate to world coordinates
+            set {_x} to {_xz-temp} * {_x-conversion}
+            set {_z} to {_xz-temp} * {_z-conversion}
+
+            set {_point} to {_vertex} ~ vector({_x}, {_y}, {_z})
+            add {_point} to {_points::*}
+
+    return {_points::*}
