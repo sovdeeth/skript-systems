@@ -1,0 +1,39 @@
+# takes in a line of text to colour, a start colour in hex, and an end colour in hex
+function gradientText(text: text, start-colour: text, end-colour: text) :: text:
+    if "%{_start-colour}%%{_end-colour}%" doesn't match "[0-9a-fA-F]*":
+        return "Invalid Colour"
+    
+    set {_text-length} to length of {_text}
+    # get starting rgb values
+    set {_red-start} to hexToDecimal(substring of {_start-colour} from 1 to 2)
+    set {_green-start} to hexToDecimal(substring of {_start-colour} from 3 to 4)
+    set {_blue-start} to hexToDecimal(substring of {_start-colour} from 5 to 6)
+    # get ending rgb values
+    set {_red-end} to hexToDecimal(substring of {_end-colour} from 1 to 2)
+    set {_green-end} to hexToDecimal(substring of {_end-colour} from 3 to 4)
+    set {_blue-end} to hexToDecimal(substring of {_end-colour} from 5 to 6)
+    # get the amount they should change each character
+    set {_red-step} to ({_red-end} - {_red-start}) / {_text-length}
+    set {_green-step} to ({_green-end} - {_green-start}) / {_text-length}
+    set {_blue-step} to ({_blue-end} - {_blue-start}) / {_text-length}
+
+    loop {_text-length} times:
+        # get rgb values for the current character
+        set {_r} to round({_red-start} + ({_red-step} * loop-number))
+        set {_g} to round({_green-start} + ({_green-step} * loop-number))
+        set {_b} to round({_blue-start} + ({_blue-step} * loop-number))
+        # add colour + character to the string
+        set {_return-text} to "%{_return-text} ? ""%<##%decimalToHex({_r})%%decimalToHex({_g})%%decimalToHex({_b})%>%character at loop-number of {_text}%"
+    # return final string
+    return formatted {_return-text}
+
+# decimal to hexadecimal helper function. domain of 0-255.
+function decimalToHex(decimal: number) :: text:
+    return ("00" if {_decimal} <= 0, else ("FF")) if {_decimal} is not between 0 and 255
+    return join (character at (mod((floor({_decimal} / 16)), 16) + 1) in "0123456789ABCDEF") and (character at ((mod({_decimal}, 16)) + 1) in "0123456789ABCDEF")
+
+# hexadecimal to decimal helper function. requires two hex digits, domain of 0-255.
+function hexToDecimal(hex: text) :: number:
+    return 0 if {_hex} does not match "[0-9a-fA-F]{2}"
+    set {_hex::*} to split {_hex} at ""
+    return 16 * (first index of {_hex::1} in "0123456789ABCDEF" - 1) + (first index of {_hex::2} in "0123456789ABCDEF" - 1)
