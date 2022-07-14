@@ -16,6 +16,7 @@ function gradientText(text: text, start-colour: text, end-colour: text) :: text:
     set {_red-step} to ({_red-end} - {_red-start}) / {_text-length}
     set {_green-step} to ({_green-end} - {_green-start}) / {_text-length}
     set {_blue-step} to ({_blue-end} - {_blue-start}) / {_text-length}
+    debug {_red-start}, {_blue-start}, {_green-start}
 
     loop {_text-length} times:
         # get rgb values for the current character
@@ -35,5 +36,5 @@ function decimalToHex(decimal: number) :: text:
 # hexadecimal to decimal helper function. requires two hex digits, domain of 0-255.
 function hexToDecimal(hex: text) :: number:
     return 0 if {_hex} does not match "[0-9a-fA-F]{2}"
-    set {_hex::*} to split {_hex} at ""
-    return 16 * (first index of {_hex::1} in "0123456789ABCDEF" - 1) + (first index of {_hex::2} in "0123456789ABCDEF" - 1)
+    set {_hex} to {_hex} in uppercase
+    return 16 * (first index of (character at 1 in {_hex}) in "0123456789ABCDEF" - 1) + (first index of (character at 2 in {_hex}) in "0123456789ABCDEF" - 1)
