@@ -1,0 +1,89 @@
+# Very basic functions that returns locations to draw particle shapes
+
+# Line from A to B. Can customize the density of the line with the step-size parameter.
+function line(loc1: location, loc2: location, step-size: number=0.25) :: locations:
+    # set up step vector
+    set {_v} to vector from {_loc1} to {_loc2}
+    set vector length of {_v} to {_step-size}
+
+    # total distance / step size = number of steps needed
+    loop floor((distance between {_loc1} and {_loc2}) / {_step-size}) times:
+        # store location and move a step
+        set {_locs::%loop-number%} to {_loc1}
+        set {_loc1} to {_loc1} ~ {_v}
+
+    # return list of locations
+    return {_locs::*}
+
+
+# Basic circle. step-size is in degrees.
+# yaw/pitch can be used to tilt the circle in various ways
+function circle(center: location, radius: number, step-size: number = 10, yaw: number = 0, pitch: number = 0) :: locations:
+    # refernce vector for rotation around
+    set {_reference} to vector from yaw {_yaw} + 90 and pitch 0
+    # vector to get locations with
+    set {_v} to spherical vector with radius {_radius}, yaw 0, pitch 0
+
+    # 360 degrees / step size = number of steps needed
+    loop floor(360 / {_step-size}) times:
+        # copy vector for rotation
+        set {_temp-v} to {_v}
+        # rotate if necessary
+        if {_pitch} is not 0:
+            rotate {_temp-v} around {_reference} by {_pitch}
+        # store location and move a step
+        set {_locs::%loop-number%} to {_center} ~ {_temp-v}
+        add {_step-size} to yaw of {_v} 
+
+    # return list of locations
+    return {_locs::*}
+
+
+# A regular polygon.
+# offset is janky but allows for polygons to be drawn in different orientations but still rotate together.
+function regularPolygon(center: location, radius: number, sides: number, step-size: number = 0.25, offset: number = 0, yaw: number = 0, pitch: number = 0) :: locations:
+    # refernce vector for rotation around
+    set {_reference} to vector from yaw {_yaw} + 90 and pitch 0
+    # vector to get locations with
+    set {_v} to spherical vector radius {_radius}, yaw {_offset}, pitch 0
+    loop {_sides} times:
+        # get point
+        set {_temp-v} to {_v}
+        # rotate if necessary
+        if {_pitch} is not 0:
+            rotate {_temp-v} around {_reference} by {_pitch}
+        set {_loc::%loop-number%} to {_center} ~ {_temp-v}
+        # move to next point
+        add 360 / {_sides} to yaw of {_v}
+
+    # get all the lines
+    loop {_sides} times:
+        if loop-number != {_sides}:
+            add line({_loc::%loop-number%}, {_loc::%loop-number + 1%}) to {_locs::*}
+        else:
+            add line({_loc::%loop-number%}, {_loc::1}) to {_locs::*}
+
+    # return list of locations along the lines
+    return {_locs::*}
+
+function cuboid(x: number, y: number, z: number)
+
+
+command magicCircle:
+    trigger:
+        loop 200 times:
+            # add 1 to {_yaw}
+            # add 1 to {_pitch}
+            set {_pitch} to -1 * player's pitch + 90
+            set {_yaw} to player's yaw
+            set {_offset} to spherical vector with radius 3, yaw player's yaw, pitch player's pitch
+            set {_loc} to player's head's location ~ {_offset}
+            # draw 3 circles
+            draw 1 of electric spark at circle(({_loc}), 1.75, 10, {_yaw}, {_pitch}) with extra 0
+            draw 1 of electric spark at circle(({_loc}), 4, 2, {_yaw}, {_pitch}) with extra 0
+            draw 1 of electric spark at circle(({_loc}), 4.45, 2, {_yaw}, {_pitch}) with extra 0
+            # draw the 2 triangles
+            draw 1 of electric spark at regularPolygon(({_loc}), 4, 3, 0.25, {_yaw}, {_yaw}, {_pitch}) with extra 0
+            draw 1 of electric spark at regularPolygon(({_loc}), 4, 3, 0.25, 60 + {_yaw}, {_yaw}, {_pitch}) with extra 0
+            wait 1 tick
+

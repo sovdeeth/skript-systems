@@ -1,0 +1,289 @@
+import:
+    com.sovdee.bitwise.BitwiseOperators as bit
+
+on load:
+    set {_example} to bit.longXOR(10234, 23045) 
+
+options:
+    Rotate-3D-Ortho: -0.21132486540518713
+    sqrt3/3: 0.57735026918962562
+
+    R-Squared: 0.6
+    Seed-Flip: -5968755714895566377
+
+
+# Open Simplex Noise 2 in Skript
+
+function noise3_ImproveXY(seed: number, x: number, y: number, z: number) :: number:
+    set {_xy} to {_x} + {_y}
+    set {_s2} to {_xy} * {@Rotate-3D-Ortho}
+    set {_zz} to {_z} * {@sqrt3/3}
+    set {_xr} to {_x} + {_zz} + {_s2}
+    set {_yr} to {_y} + {_zz} + {_s2}
+    set {_zr} to {_xy} * -1 * {@sqrt3/3} + {_zz} 
+    return noise3_UnrotatedBase({_seed}, {_xr}, {_yr}, {_zr})
+
+function noise3_UnrotatedBase(seed: number, x: number, y: number, z: number) :: number:
+    # rounded values
+    set {_xr} to round({_x})
+    set {_yr} to round({_y})
+    set {_zr} to round({_z})
+    # decimal values
+    set {_xri} to {_x} - {_xr}
+    set {_yri} to {_y} - {_yr}
+    set {_zri} to {_z} - {_zr}
+    # get opposite signs
+    set {_xsign} to 1 if {_xri} < 0 else -1
+    set {_ysign} to 1 if {_yri} < 0 else -1
+    set {_zsign} to 1 if {_zri} < 0 else -1
+    # get absolute values
+    set {_abs-xri} to abs({_xri})
+    set {_abs-yri} to abs({_yri})
+    set {_abs-zri} to abs({_zri})
+
+    # "primes" (for hash)
+    set {_xrp} to {_xr}
+    set {_yrp} to {_yr}
+    set {_zrp} to {_zr}
+
+    set {_value} to 0
+    set {_a} to ({@R-Squared} - {_xri}^2) - ({_yri}^2 + {_zri}^2)
+    # debug {_a}
+    loop 2 times:
+        add 1 to {_l}
+
+        # closest point on cube
+        if {_a} > 0:
+            add {_a}^4 * grad({_seed}, {_xrp}, {_yrp}, {_zrp}, {_xri}, {_yri}, {_zri}) to {_value}
+
+        # second-closest point on cube
+        set {_max} to max({_abs-xri}, {_abs-yri}, {_abs-zri})
+        if {_abs-xri} = {_max}:
+            set {_b} to {_a} + 2 * {_abs-xri}
+            if {_b}  > 1:
+                subtract 1 from {_b}
+                add ({_b}^4 * grad({_seed}, ({_xrp} - {_xsign}), {_yrp}, {_zrp}, ({_xri} + {_xsign}), {_yri}, {_zri})) to {_value}
+        else if {_abs-yri} = {_max}:
+            set {_b} to {_a} + 2 * {_abs-yri}
+            if {_b}  > 1:
+                subtract 1 from {_b}
+                add ({_b}^4 * grad({_seed}, {_xrp}, ({_yrp} - {_ysign}), {_zrp}, {_xri}, ({_yri} + {_ysign}), {_zri})) to {_value}
+        else:
+            set {_b} to {_a} + 2 * {_abs-zri}
+            if {_b}  > 1:
+                subtract 1 from {_b}
+                add ({_b}^4 * grad({_seed}, {_xrp}, {_yrp}, ({_zrp} - {_zsign}), {_xri}, {_yri}, ({_zri} + {_zsign}))) to {_value}
+
+        # break
+        if loop-value > 1:
+            exit 1 loop
+
+        # update absolute values
+        set {_abs-xri} to 0.5 - {_abs-xri}
+        set {_abs-yri} to 0.5 - {_abs-yri}
+        set {_abs-zri} to 0.5 - {_abs-zri}
+
+        # update relative coords
+        set {_xri} to {_abs-xri} * {_xsign}
+        set {_yri} to {_abs-yri} * {_ysign}
+        set {_zri} to {_abs-zri} * {_zsign}
+
+        # update falloff
+        add ((0.75 - {_abs-xri}) - ({_abs-yri} + {_abs-zri})) to {_a}
+
+        # update prime multiplication
+        add 1 to {_xrp} if {_xsign} = -1
+        add 1 to {_yrp} if {_ysign} = -1
+        add 1 to {_zrp} if {_zsign} = -1
+
+        # update signs
+        set {_xsign} to -1 * {_xsign}
+        set {_ysign} to -1 * {_ysign}
+        set {_zsign} to -1 * {_zsign}
+        set {_seed} to bit.longXOR({_seed}, {@Seed-Flip})
+    
+    return {_value}
+
+function grad(seed: number, x: number, y: number, z: number, dx: number, dy: number, dz: number) :: number:
+    set {_gi} to hash14({_seed}, {_x} * 90481, {_y} * 80737, {_z} * 62417)
+    # debug {_gi}
+    # debug {grad-3d::%{_gi}%} * {_dx} + {grad-3d::%bit.longOR({_gi}, 1)%} * {_dy} + {grad-3d::%bit.longOR({_gi}, 2)%} * {_dz}
+    return {grad-3d::%{_gi}%} * {_dx} + {grad-3d::%{_gi} + 1%} * {_dy} + {grad-3d::%{_gi} + 2%} * {_dz}
+
+function hash14(seed: number, x: number, y: number, z: number) :: number:
+    set {_a} to ({_seed} * 0.1031) - floor({_seed} * 0.1031)
+    set {_b} to ({_x} * 0.1030) - floor({_x} * 0.1030)
+    set {_c} to ({_y} * 0.0973) - floor({_y} * 0.0973)
+    set {_f} to ({_z} * 0.1099) - floor({_z} * 0.1099)
+    set {_d} to vector({_a}, {_b}, {_c}) dot vector({_f} + 33.33, {_c} + 33.33, {_b} + 33.33) + ({_f} * ({_a} + 33.33))
+    add {_d} to {_a}
+    add {_d} to {_b}
+    add {_d} to {_c}
+    add {_d} to {_f}
+
+    set {_e} to ({_a} + {_b}) * ({_c} + {_f})
+    return floor(({_e} - floor({_e})) * 256) * 4
+
+# # setup gradients
+# on load:
+#     clear {grad-3d::*}
+#     add (2.22474487139, 2.22474487139, -1.0, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, 2.22474487139, 1.0, 0.0) to {_grad-3d::*}
+#     add (3.0862664687972017, 1.1721513422464978, 0.0, 0.0) to {_grad-3d::*}
+#     add (1.1721513422464978, 3.0862664687972017, 0.0, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, 2.22474487139, -1.0, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, 2.22474487139, 1.0, 0.0) to {_grad-3d::*}
+#     add (-1.1721513422464978, 3.0862664687972017, 0.0, 0.0) to {_grad-3d::*}
+#     add (-3.0862664687972017, 1.1721513422464978, 0.0, 0.0) to {_grad-3d::*}
+#     add (-1.0, -2.22474487139, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (1.0, -2.22474487139, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (0.0, -3.0862664687972017, -1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (0.0, -1.1721513422464978, -3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (-1.0, -2.22474487139, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (1.0, -2.22474487139, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (0.0, -1.1721513422464978, 3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (0.0, -3.0862664687972017, 1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, -2.22474487139, -1.0, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, -2.22474487139, 1.0, 0.0) to {_grad-3d::*}
+#     add (-3.0862664687972017, -1.1721513422464978, 0.0, 0.0) to {_grad-3d::*}
+#     add (-1.1721513422464978, -3.0862664687972017, 0.0, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, -1.0, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, 1.0, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (-1.1721513422464978, 0.0, -3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (-3.0862664687972017, 0.0, -1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, -1.0, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (-2.22474487139, 1.0, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (-3.0862664687972017, 0.0, 1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (-1.1721513422464978, 0.0, 3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (-1.0, 2.22474487139, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (1.0, 2.22474487139, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (0.0, 1.1721513422464978, -3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (0.0, 3.0862664687972017, -1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (-1.0, 2.22474487139, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (1.0, 2.22474487139, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (0.0, 3.0862664687972017, 1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (0.0, 1.1721513422464978, 3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, -2.22474487139, -1.0, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, -2.22474487139, 1.0, 0.0) to {_grad-3d::*}
+#     add (1.1721513422464978, -3.0862664687972017, 0.0, 0.0) to {_grad-3d::*}
+#     add (3.0862664687972017, -1.1721513422464978, 0.0, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, -1.0, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, 1.0, -2.22474487139, 0.0) to {_grad-3d::*}
+#     add (3.0862664687972017, 0.0, -1.1721513422464978, 0.0) to {_grad-3d::*}
+#     add (1.1721513422464978, 0.0, -3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, -1.0, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (2.22474487139, 1.0, 2.22474487139, 0.0) to {_grad-3d::*}
+#     add (1.1721513422464978, 0.0, 3.0862664687972017, 0.0) to {_grad-3d::*}
+#     add (3.0862664687972017, 0.0, 1.1721513422464978, 0.0) to {_grad-3d::*}
+
+#     loop {_grad-3d::*}:
+#         set {_grad-3d::%loop-index%} to loop-value / 0.07969837668935331
+
+#     loop ((2^8) * 4) times:
+#         add 1 to {_count}
+#         set {grad-3d::%loop-number - 1%} to {_grad-3d::%{_count}%}
+#         if {_count} = size of {_grad-3d::*}:
+#             set {_count} to 0
+
+function setGrid(pos1: location, pos2: location, step: number = 2.3):
+    set {-grid::pos1} to {_pos1}
+    set {-grid::x-length} to abs(x-coordinate of {_pos2} - x-coordinate of {_pos1})
+    set {-grid::z-length} to abs(z-coordinate of {_pos2} - z-coordinate of {_pos1})
+    set {-grid::x-dir} to (x-coordinate of {_pos2} - x-coordinate of {_pos1}) / {-grid::x-length}
+    set {-grid::z-dir} to (z-coordinate of {_pos2} - z-coordinate of {_pos1}) / {-grid::z-length}
+    set {-grid::scale} to 0.05
+    set {-grid::seed} to random integer between -798645292314 and 73984239846 
+    set {-grid::step} to {_step}
+    kill all armor stands where [metadata tag "grid" of input is true]
+    clear {-grid::stands::*}
+    loop floor({-grid::x-length} * {-grid::step}) times:
+        set {_x} to (loop-value) * {-grid::x-dir} / {-grid::step}
+        loop floor({-grid::z-length} * {-grid::step}) times:
+            set {_z} to (loop-value-2) * {-grid::z-dir} / {-grid::step}
+            spawn armor stand at {_pos1} ~ vector({_x}, 0, {_z}):
+                entity.setVisible(false)
+                entity.setSmall(true)
+                entity.setSilent(true)
+                entity.setMarker(true)
+                entity.setInvulnerable(true)
+                set helmet of entity to moss block
+                set metadata tag "grid" of entity to true
+            set {-grid::stands::%loop-value-1%::%loop-value-2%} to last spawned entity
+    set {-grid::update} to true
+
+
+function displayGrid(seed: number, scale: number = 0.1, amplitude: number = 1, offset: numbers = (0, 0), step: number = 2.3):
+    set {_x-width} to floor({-grid::x-length} * {_step})
+    set {_z-width} to floor({-grid::z-length} * {_step})
+    loop {_x-width} times:
+        set {_x} to (loop-value - floor({_x-width} / 2)) * {_scale} * {-grid::x-dir} + {_offset::1}
+        loop {_z-width} times:
+            set {_z} to (loop-value-2  - floor({_z-width} / 2)) * {_scale} * {-grid::z-dir} + {_offset::2}
+            set {_value} to max(-0.6, noise3_ImproveXY({_seed}, {_x}, 0, {_z}))
+            set {_e} to {-grid::stands::%loop-value-1%::%loop-value-2%}
+            {_e}.teleport({-grid::pos1} ~ vector((loop-value-1 * {-grid::x-dir} / {_step}), ({_value} * {_amplitude}), (loop-value-2 * {-grid::z-dir} / {_step})))
+            add random number between -0.1 and 0.1 to {_value} if {_value} > 0
+            if {_value} > 0.5:
+                set helmet of {_e} to snow block
+            else if {_value} > 0.2:
+                set helmet of {_e} to stone
+            else if {_value} > -0.5:
+                set helmet of {_e} to moss block
+            else if {_value} > -0.6:
+                set helmet of {_e} to sand
+            else:
+                set helmet of {_e} to blue concrete
+
+on skript stop:
+    kill all armor stands where [metadata tag "grid" of input is true]
+
+command /noiseEditor:
+    trigger:
+        if {noise} is set:
+            clear {noise}
+        else:
+            set {noise} to player
+
+import:
+    org.bukkit.event.player.PlayerMoveEvent
+
+on PlayerMoveEvent:
+    {noise} is event.getPlayer()
+    set {_v} to vector from event.getFrom() to event.getTo()
+    set y component of {_v} to 0
+    if vector length of {_v} > 0:
+        set {_yaw} to yaw of {_v}
+        set {_v} to vector from yaw {_yaw} and pitch 0
+        set {_x} to round(x component of {_v})
+        set {_z} to round(z component of {_v})
+        add {_x} * {-grid::scale} to {-grid::offset-x}
+        add {_z} * {-grid::scale} to {-grid::offset-z}
+        set {-grid::update} to true
+        cancel event
+    y-coord of event.getFrom() != y-coord of event.getTo():
+        set {_difference} to y-coord of event.getTo() - y-coord of event.getFrom()
+        add 0.005 * {_difference} to {-grid::scale}
+
+        set {-grid::scale} to max(0, {-grid::scale})
+        set {-grid::scale} to min(1, {-grid::scale})
+        # debug {-capture::%player%::vector-length}
+        set {-grid::update} to true
+        cancel event
+
+
+        # set {-grid::seed} to random integer between -79864529 and 73984239 
+        # set {-grid::update} to true
+        # cancel event
+
+    
+
+every 1 ticks:
+    {-grid::update} is true
+    set {-grid::update} to false
+    # debug "%{-grid::seed}%, %{-grid::scale}%, %{-grid::offset-x}%, %{-grid::offset-z}%"
+    displayGrid({-grid::seed}, {-grid::scale}, 1.3, (({-grid::offset-x} ? 0),({-grid::offset-z} ? 0)), {-grid::step})
+
+
+
+         
+            
