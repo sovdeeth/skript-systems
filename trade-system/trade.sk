@@ -127,17 +127,17 @@ on inventory click:
     
     
     if event-inventory is {@tpi}:
-        if "%event-item's lore%" contains "&7 ":
+        if "%event-slot's lore%" contains "&7 ":
             tradeMarkConfirmed(player)
             cancel event
             stop
 
-        if "%event-item's lore%" contains "&6 ":
+        if "%event-slot's lore%" contains "&6 ":
             tradeAttemptComplete(player)
             cancel event
             stop
 
-        if "%event-item's lore%" contains "&8 ":
+        if "%event-slot's lore%" contains "&8 ":
             cancel event
             stop
 
@@ -157,15 +157,15 @@ on inventory click:
             # loop the player's slots in the gui
             loop {-trade::%player%::items::*}:
                 # if the slot contains the same item
-                if 1 of loop-value is 1 of event-item:
+                if 1 of loop-value is 1 of event-slot:
                     # get the two amounts
                     set {_a} to item amount of loop-value
-                    set {_b} to item amount of event-item
+                    set {_b} to item amount of event-slot
                     # ensure they add up to less than 64 (or whatever their max stack size is)
-                    if max stack size of event-item - {_a} >= {_b}:
+                    if max stack size of event-slot - {_a} >= {_b}:
                         # manually move the item to the right slot, replace it with air
                         set {_s} to (loop-index parsed as number)
-                        set slot {_s} of {@tpi} to ({_a} + {_b}) of event-item
+                        set slot {_s} of {@tpi} to ({_a} + {_b}) of event-slot
                         set event-slot to air
                         # trigger gui update
                         tradeUpdate(player)
@@ -173,10 +173,10 @@ on inventory click:
                 # if the slot contains air
                 if loop-value is air:
                     # add item to list
-                    set {-trade::%player%::items::%loop-index%} to event-item
+                    set {-trade::%player%::items::%loop-index%} to event-slot
                     # manually move item
                     set {_s} to (loop-index parsed as number)
-                    set slot {_s} of {@tpi} to event-item
+                    set slot {_s} of {@tpi} to event-slot
                     set event-slot to air
                     # trigger gui update
                     tradeUpdate(player)
