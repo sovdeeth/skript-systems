@@ -125,6 +125,9 @@ function openTradeGUI(player: player, partner: player):
 on inventory click:
     set {_player} to player
     
+    # prevent double click from duping
+    if inventory action is collect to cursor:
+        cancel event
     
     if event-inventory is {@tpi}:
         if "%event-slot's lore%" contains "&7 ":
