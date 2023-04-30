@@ -2,6 +2,8 @@
 
 **Requires: skript-yaml, skript-gui**
 
+### Note: this has not been maintained or updated for a year+. Use with caution.
+
 This skript automatically saves a backup of a player's inventory when they die. By default it stores 5 deaths back, but can be configured to whatever you want. The backups are stored in yml files, which by default are in ``plugins/Skript/scripts/inventory-backups/`` but can also be changed.
 
 The skript mainly runs through a GUI accessible through ``/invrestore <player>``. This will show you a history of their backups, starting from most recent, with 5 shown per page. You can do multiple actions by clicking on these backups in various ways. 

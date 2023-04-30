@@ -16,7 +16,6 @@ function gradientText(text: text, start-colour: text, end-colour: text) :: text:
     set {_red-step} to ({_red-end} - {_red-start}) / {_text-length}
     set {_green-step} to ({_green-end} - {_green-start}) / {_text-length}
     set {_blue-step} to ({_blue-end} - {_blue-start}) / {_text-length}
-    debug {_red-start}, {_blue-start}, {_green-start}
 
     loop {_text-length} times:
         # get rgb values for the current character

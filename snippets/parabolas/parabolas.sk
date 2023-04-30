@@ -1,9 +1,4 @@
-import:
-    org.bukkit.Particle
-    org.bukkit.Location
-
 function drawParabola(vertex: location, point: location, player: player):
-    
 
     if {parabola::%{_player}'s uuid%} is true:
         set {parabola::%{_player}'s uuid%} to false
@@ -12,9 +7,7 @@ function drawParabola(vertex: location, point: location, player: player):
     set {parabola::%{_player}'s uuid%} to true 
     set {_points::*} to getParabolaPoints({_vertex}, {_point})
     while {parabola::%{_player}'s uuid%} is true:
-        # broadcast "test"
-        loop {_points::*}:
-            {_player}.spawnParticle[Particle, Location, int, double, double, double, double](Particle.FLAME, loop-value, 1, 0.0, 0.0, 0.0, 0.0)
+        draw 1 flame particle at {_points::*} with extra 0
         wait 10 ticks
 
     set {parabola::%{_player}'s uuid%} to false

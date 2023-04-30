@@ -4,12 +4,12 @@
 #   /debug-msgs
 
 options:
-    debug-color: %color("c44127")%
+    debug-color: <##c44127>
 
 
 effect debug [message] %objects%:
     trigger:
-        send formatted "{@debug-color}[Debug] - &7%expr-1%" to (all players where [{debug::%input%} is true])
+        send formatted "{@debug-color}[Debug] - &7%expr-1%" to {debug::*}
         send formatted "{@debug-color}[Debug] - &7%expr-1%" to console
         
 
@@ -25,10 +25,10 @@ command /debug-msgs <boolean=true>:
     permission: server.debug
     trigger:
         if arg-1 is true:
-            set {debug::%player%} to true
+            set {debug::%player%} to player
             sm("success","Debug messages are now [1].", ("shown"))
         else if arg-1 is false:
-            set {debug::%player%} to false
+            delete {debug::%player%}
             sm("success","Debug messages are now [1].", ("hidden"))
         else:
             sm("error","Invalid argument, use [1].", ("/debug-msgs true/false"))

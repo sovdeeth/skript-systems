@@ -66,8 +66,48 @@ function regularPolygon(center: location, radius: number, sides: number, step-si
     # return list of locations along the lines
     return {_locs::*}
 
-function cuboid(x: number, y: number, z: number)
+# a basic sphere made of composing circles
+function basicSphere(center: location, radius: number, yaw-step-size: number = 10, pitch-step-size: number = 10) :: locations:
+    # reference vector for rotation around, and vector to get locations with
+    set {_reference} to vector(1,0,0)
+    set {_point-vector} to spherical vector with radius {_radius}, yaw 0, pitch 0 
+    # go all the way around horizontally
+    loop 360 / {_yaw-step-size} times:
+        # update yaws
+        add {_yaw-step-size} to yaw of {_reference}
+        set yaw of {_point-vector} to yaw of {_reference} + 90
+        # reset pitch to straight down
+        set pitch of {_point-vector} to -90
+        # index for storing locations
+        set {_index} to ceil(loop-number * 180 / {_yaw-step-size})
+        # rotate all the way to straight up, storing points along the way
+        loop 180 / {_pitch-step-size} times:
+            rotate {_point-vector} around {_reference} by {_pitch-step-size}
+            set {_points::%loop-number-2 + {_index}%} to {_center} ~ {_point-vector}
+    # return list of locations
+    return {_points::*}
 
+# a fancier sphere made by using the golden ratio to get points
+# more evenly distributed points than basicSphere
+function fibonacciSphere(center: location, radius: number, point-count: number = 100) :: locations:
+    # golden ratio
+    set {_phi} to 3.1415 * (3 - sqrt(5))
+    # y and step
+    set {_y} to 1
+    set {_y-step} to 2 / {_point-count}
+    # convert degrees to radians
+    set {_radians-to-degrees} to 180 / 3.1415
+    # set up points
+    loop {_point-count} times:
+        set {_r} to sqrt(1 - {_y}^2) * {_radius}
+        set {_angle} to {_phi} * loop-number * {_radians-to-degrees}
+        set {_x} to {_r} * cos({_angle})
+        set {_z} to {_r} * sin({_angle})
+        set {_points::%loop-number%} to {_center} ~ vector({_x}, {_y} * {_radius}, {_z})
+        set {_y} to {_y} - {_y-step}
+
+    # return list of locations
+    return {_points::*}
 
 command magicCircle:
     trigger:

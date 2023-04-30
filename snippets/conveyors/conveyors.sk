@@ -2,7 +2,7 @@ function createConveyorBeltItem(location: location, item: item):
     # spawn the armor stand
     spawn armor stand at {_location}:
         set entity's helmet to {_item} # set item helmet
-        add "{Invisible:1b,Invulnerable:1b,Small:1b,Marker:1b}" to entity's nbt # all the nbt stuff
+        add nbt from "{Invisible:1b,Invulnerable:1b,Small:1b,Marker:1b}" to entity's nbt # all the nbt stuff
 
     # store armor stand
     set {_e} to last spawned entity 

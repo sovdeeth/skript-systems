@@ -1,5 +1,7 @@
 # World Edit CUI in Skript
 
+### Note: this has not been maintained or updated for a while. Use with caution.
+
 **requires skript-reflect, worldedit plugin, as well as the worldedit plugin jar place in the skript-reflect plugin folder.**
 
 This skript will outline your current selection, given that your selection is the normal cuboid, the sphere, ellipsoid, or 2d polygon (//sel poly).

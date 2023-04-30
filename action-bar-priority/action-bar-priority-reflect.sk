@@ -18,7 +18,7 @@ effect:
 
         loop {_recipients::*}:
             # is the action bar locked
-            if difference between {-actionbarlockout::%loop-value%::time} and now is less than {-actionbarlockout::%loop-value%::duration}:
+            if time since {-actionbarlockout::%{_player}%::time} is less than {-actionbarlockout::%{_player}%::duration}:
                 # can we override?
                 if {_priority} < {-actionbarlockout::%loop-value%::priority}:
                     # if it's locked and we can't override, we continue

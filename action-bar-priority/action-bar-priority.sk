@@ -37,7 +37,7 @@ function sendActionBar(player: player, text: text, duration: timespan, priority:
     
 # Check for locked action bar without locking it yourself
 function actionBarIsLocked(player: player) :: boolean:
-    if difference between {-actionbarlockout::%{_player}%::time} and now is less than {-actionbarlockout::%{_player}%::duration}:
+    if time since {-actionbarlockout::%{_player}%::time} is less than {-actionbarlockout::%{_player}%::duration}:
         return true
     return false
     

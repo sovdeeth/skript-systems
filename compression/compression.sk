@@ -13,9 +13,11 @@ on load:
 
 on pick up:
     # ensure item is compressible
-    {compressables::*} contains event-item
+    {compress::compressables::*} contains event-item
     # wait for the item to get picked up
     wait 1 ticks
+    # ensure the event actually happened
+    event is not cancelled
     # compress
     compressItems(event-item, player's inventory)
 
@@ -33,21 +35,23 @@ function compressItems(item: item, inv: inventory):
     # set up compressed item
     set {_compressed-item} to 1 of {_item}
     set {_compressed-item}'s name to "&r%{compress::tiers::%{_tier} + 1%}% %type of {_item}%" in proper case
-        
+    
     # get the slots with the normal item in them (ie: same type, same name)
     set {_slots::*} to (integers between 0 and 35) where [1 of (slot input of {_inv}) is 1 of {_item}]
     # unnamed items will match any named item, so ensure only matches unnamed
     if {_item}'s name is not set: 
         set {_slots::*} to {_slots::*} where [(slot input of {_inv})'s name is not set] 
-
+    
     # calculate amount of compressed to give, then give it
     add item amount of slot {_slots::*} of {_inv} to {_normal-amount}
-    add floor({_normal-amount} / 9) of {_compressed-item} to {_inv}
 
     # remove all normal items and then give back the excess
     clear slot {_slots::*} of {_inv}
     set slot {_slots::1} of {_inv} to mod({_normal-amount},9) of {_item}
 
+    # add compressed item to inventory (we waited to do this so we could clear the slots first)
+    add floor({_normal-amount} / 9) of {_compressed-item} to {_inv}
+    
     # compress further
     compressItems({_compressed-item}, {_inv})
 
