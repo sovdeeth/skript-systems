@@ -1,246 +1,354 @@
-# Handles storing, restoring, and viewing player inventory backups
-# Contains:
-#   /invrestore
-#    viewBackup()
-#   restoreBackup()
+# Inventory Restoration
+# by Sovde (@Sovde#0001)
+
+# Requires SkBee 2.8.2+ (should work on 2.5.0+, but untested) and skript-gui 1.3+
+
+# Stores backups of inventories when players die using NBT files.
+# The files can be found in the directory folder (see options), labeled with the player's UUID.
+# By default, backups are stored for 30 days, but you can change that in the options
+
+# Backups can be viewed, edited, restored, and deleted using a GUI.
+# Edits will only be saved when the player clicks the "Save edits" button in the GUI.
+
+# When restoring, items will be placed back in the same slots they were in when the player died, if possible.
+# If the player has no space in their inventory, items will be dropped on the ground.
 
 options:
-    cm: <##888898>
-    ca: <##BBCCD7>
-    cw: <##DD8c8c>
-    ce: <##FF3434>
-    cs: <##22AA62>
-    max-deaths-stored: 5
-    directory: plugins/Skript/scripts/inventory-backups
+    # How long backups are stored for
+    # Set to -1 to store backups forever
+    age-limit: 30 days
+
+    # Where to store backups
+    directory: plugins/inventory-restore
+
+    # Colours
+    accent: <##aabbff>
+    main: <##9999a0>
+    warning: <##f5a147>
+    error: <##cc3434>
+    success: <##22aa6a>
+
+    # error/success messages:
+    # by default looks like "[!] Message here."
+    prefix: [!]
+    # when backups are restored to the player ({_target})
+    restored-me-sucess: Your inventory has been restored!
+    restored-sucess: %{_target}%'s inventory has been restored!
+    # when backup edits are saved
+    saved-sucess: Your edits have been saved!
+    # when backups are deleted
+    deleted-sucess: Backup deleted!
+    # when backups can't be found
+    non-existent-error: That backup does not exist!
+    # when the player ({_target}) is offline
+    offline-error: %{_target}% is offline! 
 
 
-on load:
-    set {invrestore::abort} to false
-    if {@max-deaths-stored} < 1:
-        set {invrestore::abort} to true
-        loop all players where [player input has permission "admin"]:
-            send "test" to loop-player
-            send formatted "{@ce} Inventory Restore cannot store 0 or fewer deaths. %nl% Please set max-death-stored to at least 1." to loop-value
+
+command /invrestore <offlineplayer>:
+    permission: invrestore.restore
+    trigger:
+        openInvRestoreGUI(player, arg-1)
 
 
 # storing death data
 on death of player:
-    if {invrestore::abort} is true:
-        stop
-    # load player's log file
-    load yaml "{@directory}/%player's uuid%-deaths.yml" as "log"
+    # setup nbt
+    set {_entry} to blank nbt compound 
+    set {_now} to unix timestamp of now
 
-    # get death number
-    if yaml path "deathcounter" in "log" does not exist:
-        set yaml value "deathcounter" in "log" to 0
-        set {_count} to 0
-    else:
-        set {_count} to yaml value "deathcounter" in "log"
+    # inventory data
+    loop items in victim's inventory:
+        set {_nbt} to full nbt compound copy of loop-value
+        set tag "Slot" of {_nbt} to index of loop-value
+        set {_items::%index of loop-value%} to {_nbt}
+    
+    set compound list tag "Inventory" of {_entry} to {_items::*}
+    
+    # metadata
+    set tag "Message" of {_entry} to death message
+    set long tag "Timestamp" of {_entry} to {_now} * 1000
 
-    # increment death number and save meta-data
-    add 1 to {_count}
-    set yaml value "deaths.%{_count}%.timestamp" in "log" to now
-    set yaml value "deaths.%{_count}%.location" in "log" to victim's location
-    set yaml value "deaths.%{_count}%.message" in "log" to death message
+    set {_location} to victim's location
+    set float list tag "Position" of {_entry} to (x coordinate of {_location}), (y coordinate of {_location}), (z coordinate of {_location})
+    set tag "World" of {_entry} to "%world of {_location}%"
 
-    # save the inventory
-    set yaml list "deaths.%{_count}%.inv" in "log" to all items in victim's inventory
+    # save to file
+    set {_file} to nbt from file "{@directory}/%victim's uuid%-deaths.nbt"
+    set {_entries::*} to compound list tag "Deaths" of {_file}
+    add {_entry} to {_entries::*}
 
-    # delete extraneous backups
-    deleteExtraBackups("log")
+    # clean up old backups
+    set {_limit} to {@age-limit}
+    if {_limit} is not -1:
+        loop {_entries::*}:
+            set {_timestamp} to long tag "Timestamp" of loop-value
+            set {_date} to unix date of ({_timestamp} / 1000)
+            if time since {_date} >= {_limit}:
+                remove loop-value from {_entries::*}
 
-    # update death count
-    set yaml value "deathcounter" in "log" to {_count}
-    save yaml "log"
-    unload yaml "log"
-
-
-
-
-
-# inv restore command
-command /invrestore <offline player> [<integer=1>]:
-    permission: admin
-    trigger:
-        if {invrestore::abort} is true:
-            send formatted "{@ce} Inventory Restore cannot store 0 or fewer deaths. %nl% Please set max-death-stored to at least 1." 
-            stop
-
-        load yaml "{@directory}/%arg-1's uuid%-deaths.yml" as "%arg-1%-log"
-
-        deleteExtraBackups("%arg-1%-log")
-
-        set {_nodes::*} to reversed yaml node list "deaths" from "%arg-1%-log"
-        set {_total-nodes} to size of {_nodes::*}
-
-        set {_page} to arg-2 
-        set {_index} to 5 * ({_page} - 1) + 1
+    set compound list tag "Deaths" of {_file} to {_entries::*}
+    save nbt file of {_file}
 
 
-        create gui with virtual chest inventory with 3 rows named formatted "&8Inventory Backups: %arg-1%" and shape "0000h0000", "001234500", and "000b0n000":
 
-            # info item, head of player
-            make gui slot "h" with arg-1's head named "{@ca}%arg-1%'s {@cm}Inventory Backups"
-            
-            # loop through all the recorded deaths
-            set {_display-count} to min(5, {_total-nodes} - {_index} + 1)
-            loop {_display-count} times:
+# main gui
+function openInvRestoreGUI(viewer: player, target: offlineplayer, page: number = 1):
+    # get entries from file
+    set {_file} to nbt of file "{@directory}/%{_target}'s uuid%-deaths.nbt"
+    set {_entries::*} to compound list tag "Deaths" of {_file}
 
-                set {_node} to {_nodes::%{_index}%}
-                
-                # get all the meta-data
-                set {_death-count} to the last element of ("%{_node}%" split at ".") # getting the id from the whole path string
+    # clean up old backups
+    set {_limit} to {@age-limit}
+    if {_limit} is not -1:
+        loop {_entries::*}:
+            set {_timestamp} to long tag "Timestamp" of loop-value
+            set {_date} to unix date of ({_timestamp} / 1000)
+            if time since {_date} >= {_limit}:
+                remove loop-value from {_entries::*}
+    set compound list tag "Deaths" of {_file} to {_entries::*}
+    save nbt file of {_file}
 
-                set {_timestamp} to yaml value "%{_node}%.timestamp" from "%arg-1%-log"
-                set {_location} to yaml value "%{_node}%.location" from "%arg-1%-log"
-                set {_message} to yaml value "%{_node}%.message" from "%arg-1%-log"
-                set {_inv::*} to yaml list "%{_node}%.inv" from "%arg-1%-log"
+    # order entries by timestamp, newest to oldest
+    loop {_entries::*}:
+        set {_timestamp} to long tag "Timestamp" of loop-value
+        set {_ordered-entries::%{_timestamp}%} to loop-value
+    set {_ordered-entries::*} to reversed {_ordered-entries::*}
 
-                # setup item
-                set {_item} to skeleton skull named "Death ##%{_death-count}%"
-                clear {_lore::*}
-                
-                # add meta-data to item lore
-                set {_lore::1} to "&7&o""%{_message}%"""
-                set {_lore::2} to "{@ca}Timestamp: {@cm}%{_timestamp}%"
-                
-                # get location and format into xyz and world separately
-                set {_location::*} to "%{_location}%" split at ", "
-                set {_world::*} to {_location::5} split at "in "
-                set {_world} to {_world::2} 
-                set {_lore::3} to "{@ca}Location: {@cm}%{_location::1}%, %{_location::2}%, %{_location::3}%"
-                set {_lore::4} to "{@ca}World: {@cm}%{_world}%" 
-                set {_lore::5} to "" 
-                
-                # add instructions to lore
-                set {_lore::6} to "{@ca}Left-click {@cm}to {@ca}view {@cm}the backup" 
-                set {_lore::7} to "{@ca}Right-click {@cm}to {@ca}restore {@cm}the backup" 
-                set {_lore::8} to "{@ca}Shift-left-click {@cm}to {@ca}teleport {@cm}the to death location" 
-                set {_lore::9} to "{@ca}Shift-right-click {@cm}to {@ca}delete {@cm}the backup" 
-                
-                # check if backup has already been restored to player
-                if yaml value "%{_node}%.restored" from "%arg-1%-log" is true:
-                    set {_lore::10} to "%nl%{@cw}This backup has been previously restored!" 
-                    
-                # set the item's lore to meta-data + instructions
-                set lore of {_item} to {_lore::*}
-                
-                # save player for click-events
-                set {_p} to arg-1
-                
-                # format the death gui slots 
-                make gui slot "%loop-value%" with {_item}:
-                    # if left, view
-                    if gui click type is left mouse button:
-                        viewBackup(player, {_p}, {_death-count}, {_location})
-                    # if right, restore
-                    if gui click type is right mouse button:
-                        restoreBackup({_p}, {_death-count})
-                        close player's inventory
-                        send action bar "{@cs}Restored backup!" to player
-                    # if left-shift, teleport
-                    if gui click type is left mouse button with shift:
-                        teleport player to {_location}
-                        close player's inventory
-                    # if right-shift, delete
-                    if gui click type is right mouse button with shift:
-                        delete yaml path list "deaths.%{_death-count}%" in "%{_p}%-log"
-                        save yaml "%{_p}%-log"
-                        make player execute command "/invrestore %{_p}%"
-                
-                
-                # check if we need to add page management items
-                if {_total-nodes} > 5*{_page}:
-                    make gui slot "n" with book named "{@cm}Next Page":
-                        make player execute command "/invrestore %{_p}% %{_page} + 1%"
-                        
-                if {_index} > 5:
-                    make gui slot "b" with book named "{@cm}Previous Page":
-                        make player execute command "/invrestore %{_p}% %{_page} - 1%"
-                
-                # increment the counter value
-                add 1 to {_index}
-                    
-        open last gui to player
+    # set up gui
+    create a gui with virtual chest inventory with 3 rows named "{@main}Inventory Backups":
+        format gui slot 4 with {_target}'s skull named "{@accent}%{_target}%{@main}'s Inventory Backups"
+        set {_slot} to 11
+        # manage pagination
+        set {_counter} to 0
+        set {_start} to 1 + (5 * ({_page} - 1))
+        set {_end} to 5 + (5 * ({_page} - 1))
+        loop {_ordered-entries::*}:
+            add 1 to {_counter}
+            # skip entries outside of page range
+            if {_counter} is not between {_start} and {_end}:
+                continue
 
-# viewing the backups
-function viewBackup(viewer: player, player: offline player, id: string, loc: location):
-    close {_viewer}'s inventory
-    create gui with virtual chest inventory with 6 rows named formatted "&8Backup %{_id}% for %{_player}%" with shape "123456789", "xyz-efghi", "jklmnopqr", "stuvwABCD","EFGHIJKLM", and "0a0b0c0d0":
-        # get inv data
-        set {_inv::*} to yaml list "deaths.%{_id}%.inv" from "%{_player}%-log"
-        # format slot with the items
-        loop {_inv::*}:
-            make next gui slot with moveable loop-value
-        # return item
-        make gui slot "a" with red stained glass pane named "{@cm}Return to Overview":
-            make {_viewer} execute command "/invrestore %{_player}%"
-        # restore item
-        make gui slot "b" with green stained glass pane named "{@ca}Restore {@cm}this backup to {@ca}%{_player}%" with lore "{@ca}Shift-click {@cm}to overwrite their current inventory.":
-            if {_player} is offline:
-                send formatted "{@ce} Player is offline!" to {_viewer}
-                stop
-            # handle whether to overwrite or simply give
-            if gui click type is right mouse button with shift or left mouse button with shift:
-                restoreBackup({_player}, {_id}, true)
-            else:
-                restoreBackup({_player}, {_id})
-            close {_viewer}'s inventory
-            send formatted "{@cs} Restored backup!" to {_viewer}
-        # teleport item
-        make gui slot "c" with ender pearl named "{@ca}Teleport {@cm}to the death loation":
-            teleport {_viewer} to {_loc}
-        # delete item
-        make gui slot "d" with barrier named "{@cw}Delete {@cm}this backup":
-            delete yaml path list "deaths.%{_id}%" in "%{_player}%-log"
-            save yaml "%{_player}%-log"
-            make {_viewer} execute command "/invrestore %{_player}%"
+            set {_item} to a skeleton skull named "Death"
+            clear {_lore::*}
+
+            # add meta-data to item lore
+            add "&7&o""%tag "Message" of loop-value%""" to {_lore::*}
+            set {_timestamp} to long tag "Timestamp" of loop-value
+            add "{@accent}Timestamp: &f%unix date of {_timestamp} / 1000%" to {_lore::*}
+            set {_pos::*} to float list tag "Position" of loop-value
+            set {_pos::*} to "%{_pos::1}%", "%{_pos::2}%", "%{_pos::3}%"
+            add "{@accent}Location: &f%join {_pos::*} with ", "% {@main}in &f%tag "World" of loop-value%" to {_lore::*}
+
+            add "" to {_lore::*}
+
+            # add instructions to lore
+            add "{@main}Left-click &fto {@accent}view &fthe backup" to {_lore::*}
+            add "{@main}Right-click &fto {@accent}restore &fthe backup" to {_lore::*}
+            add "{@main}Shift-left-click &fto {@accent}teleport &fthe to death location" to {_lore::*}
+            add "{@main}Shift-right-click &fto {@accent}delete &fthe backup" to {_lore::*}
+
+            # check if backup has already been restored to player
+            if loop-value has tag "restored":
+                add "%nl%{@warning}This backup has been previously restored!" to {_lore::*}
+
+            # add nbt tag for click events
+            set long tag "Timestamp" of (nbt of {_item}) to {_timestamp}
+
+            set lore of {_item} to {_lore::*}
+            set {_entry} to loop-value
+
+            # add item to gui, set click events
+            format gui slot {_slot} with {_item}:
+                # view backup
+                if gui click type is left mouse button:
+                    viewInvRestoreBackup({_viewer}, {_target}, {_timestamp})
+
+                # restore backup
+                else if gui click type is right mouse button:
+                    restoreInvRestoreBackup({_viewer}, {_target}, {_entry}, {_file})
+                    openInvRestoreGUI({_viewer}, {_target})
+
+                # teleport to death location
+                else if gui click type is left mouse button with shift:
+                    set {_pos::*} to float list tag "Position" of {_entry}
+                    set {_world} to tag "World" of {_entry}
+                    close {_viewer}'s inventory
+                    wait 1 tick
+                    teleport {_viewer} to location({_pos::1}, {_pos::2}, {_pos::3}, {_world})
+
+                # delete backup
+                else if gui click type is right mouse button with shift:
+                    deleteInvRestoreBackup({_target}, {_timestamp}, {_file})
+                    openInvRestoreGUI({_viewer}, {_target})
+
+            # increment slot
+            add 1 to {_slot}
+            if {_slot} is 16:
+                exit loop
+        
+        if {_page} is not 1:
+            format gui slot 21 to a book named "{@main}Previous Page":
+                openInvRestoreGUI({_viewer}, {_target}, ({_page} - 1))
+        if size of {_ordered-entries::*} is more than {_end}:
+            format gui slot 23 to a book named "{@main}Next Page":
+                openInvRestoreGUI({_viewer}, {_target}, ({_page} + 1))
+
     open last gui to {_viewer}
 
 
+# viewing the backups
+function viewInvRestoreBackup(viewer: player, target: offlineplayer, id: number):
+    # get entry from file
+    set {_file} to nbt of file "{@directory}/%{_target}'s uuid%-deaths.nbt"
+    set {_entries::*} to compound list tag "Deaths" of {_file}
+    loop {_entries::*}:
+        if long tag "Timestamp" of loop-value is {_id}:
+            set {_entry} to loop-value
+            exit loop
+
+    # ensure entry exists
+    if {_entry} is not set:
+        send "{@error}{@prefix}{@main} {@non-existent-error}" to {_viewer}
+        stop
+
+    # set up gui
+    create gui with virtual chest inventory with 6 rows named formatted "&8Backup for %{_target}%":
+        set {_items::*} to compound list tag "Inventory" of {_entry}
+
+        # ensure all inv slots can be modified
+        loop integers from 0 to 40:
+            format gui slot loop-value with removable air
+
+        # add items to gui
+        loop {_items::*}:
+            set {_item} to item from nbt loop-value
+            set {_slot} to tag "Slot" of loop-value
+            format gui slot {_slot} with removable {_item}
+
+        # controls:
+
+        # return to overview
+        format gui slot 46 to a red stained glass pane named "{@main}Return to {@accent}Overview":
+            openInvRestoreGUI({_viewer}, {_target})
+
+        # save edits
+        format gui slot 48 to a yellow stained glass pane named "{@accent}Save edits {@main}to this backup":
+            saveInvRestoreBackup({_viewer}, {_id}, {_file})
+            viewInvRestoreBackup({_viewer}, {_target}, {_id})
+
+        # restore backup
+        format gui slot 50 to a green stained glass pane named "{@accent}Restore {@main}this backup to {@accent}%{_target}%" with lore "{@accent}Shift-click {@main}to {@warning}clear the recipient's inventory{@main} first.":
+            if gui click type is left mouse button with shift or right mouse button with shift:
+                clear {_target}'s inventory
+            restoreInvRestoreBackup({_viewer}, {_target}, {_entry}, {_file})
+
+        # teleport to death location    
+        format gui slot 52 to an ender pearl named "{@accent}Teleport {@main}to the death loation":
+            set {_pos::*} to float list tag "Position" of {_entry}
+            set {_world} to tag "World" of {_entry}
+            close {_viewer}'s inventory
+            wait 1 tick
+            teleport {_viewer} to location({_pos::1}, {_pos::2}, {_pos::3}, {_world})
+
+        # delete backup
+        format gui slot 53 to a barrier named "{@error}Delete {@main}this backup":
+            deleteInvRestoreBackup({_target}, {_id}, {_file})
+            openInvRestoreGUI({_viewer}, {_target})     
+    
+    open last gui to {_viewer}
 
 
+# restoring the backups
+function restoreInvRestoreBackup(viewer: player, target: offlineplayer, entry: nbtcompound, file: nbtcompound):
+    # ensure player is online to receive items
+    if {_target} is offline:
+        send "{@error}{@prefix}{@main} {@offline-error}" to {_viewer}
+        stop
 
-# restoring a backup
-function restoreBackup(player: player, id: string, overwrite: boolean=false):
-    # clear inv if necessary
-    if {_overwrite} is true:
-        clear {_player}'s inventory
-    # loop inventory to give back to player (will overflow onto ground)
-    set {_inv::*} to yaml list "deaths.%{_id}%.inv" from "%{_player}%-log"
-    if {_player} can't hold {_inv::*}:
-        drop {_inv::*} at {_player}
-    else:
-        give {_inv::*} to {_player}
-        
+    # get inventory data
+    set {_items::*} to compound list tag "Inventory" of {_entry}
 
-    # send confirmations
-    send formatted "{@cs} Your inventory has been restored!" to {_player}
-    play sound "block.note_block.bell" with volume 1 at pitch 1.2 to {_player}
+    # loop through items
+    loop {_items::*}:
+        set {_slot} to tag "Slot" of loop-value
+        set {_item} to item from nbt loop-value
 
-    # mark as restored, save and close
-    set yaml value "deaths.%{_id}%.restored" from "%{_player}%-log" to true
-    save yaml "%{_player}%-log"
-    unload yaml "%{_player}%-log"
+        # add to original slot if possible, otherwise give to player if they have space, otherwise drop
+        if slot {_slot} of {_target}'s inventory is air:
+            set slot {_slot} of {_target}'s inventory to {_item}
+        else if {_target} has space for {_item}:
+            give {_item} to {_target}
+        else:
+            drop {_item} at {_target}
+
+    # send success message
+    send "{@success}{@prefix}{@main} {@restored-me-sucess}"  to {_target}
+    send "{@success}{@prefix}{@main} {@restored-sucess}"  to {_viewer}
+
+    # mark backup as restored
+    set {_id} to long tag "Timestamp" of {_entry}
+    set {_entries::*} to compound list tag "Deaths" of {_file}
+    loop {_entries::*}:
+        if long tag "Timestamp" of loop-value is {_id}:
+            set {_entry} to loop-value
+            exit loop
+    set tag "restored" of {_entry} to true
+    set compound list tag "Deaths" of {_file} to {_entries::*}
+    # save file
+    save nbt file of {_file}
 
 
+# Saving edits to backups
+function saveInvRestoreBackup(viewer: player, id: number, file: nbtcompound):
+    # get entry from file
+    set {_entries::*} to compound list tag "Deaths" of {_file}
+    loop {_entries::*}:
+        if long tag "Timestamp" of loop-value is {_id}:
+            set {_entry} to loop-value
+            exit loop
+    
+    # ensure entry exists
+    if {_entry} is not set:
+        send "{@error}{@prefix}{@main} {@non-existent-error}" to {_viewer}
+        stop
+    
+    # get inventory data
+    loop integers from 0 to 40:
+        set {_item} to slot loop-value of {_viewer}'s current inventory
+        if {_item} is air:
+            continue
+        set {_nbt} to full nbt compound copy of {_item}
+        set tag "Slot" of {_nbt} to loop-value
+        set {_items::%loop-value%} to {_nbt}
+    
+    # save inventory data to entry
+    set compound list tag "Inventory" of {_entry} to {_items::*}
+    set compound list tag "Deaths" of {_file} to {_entries::*}
+
+    # save file
+    save nbt file of {_file}
+
+    send "{@success}{@prefix}{@main} {@saved-sucess}" to {_viewer}
 
 
+# deleting backups
+function deleteInvRestoreBackup(viewer: player, id: number, file: nbtcompound):
+    # get entry from file
+    set {_entries::*} to compound list tag "Deaths" of {_file}
+    loop {_entries::*}:
+        if long tag "Timestamp" of loop-value is {_id}:
+            set {_entry} to loop-value
+            exit loop
 
-# delete extraneous backups
-function deleteExtraBackups(filename: string):
-    # first ensure there are extra backups to delete
-    set {_total-nodes} to (size of yaml node list "deaths" of "%{_filename}%")
-    if {_total-nodes} > {@max-deaths-stored}: 
-        # start our counter at 0
-        set {_i} to 0
-        loop yaml node list "deaths" from "%{_filename}%":
-            # stop if we have the correct amount left
-            if {_i} = {_total-nodes} - {@max-deaths-stored}:
-                exit loop
-            # delete yaml 
-            delete yaml path list loop-key in "%{_filename}%"
-            #increment counter
-            add 1 to {_i}
-        # save file
-        save yaml "%{_filename}%"   
+    # ensure entry exists
+    if {_entry} is not set:
+        send "{@error}{@prefix}{@main} {@non-existent-error}" to {_viewer}
+        stop
+
+    # remove entry from file
+    remove {_entry} from {_entries::*}
+    set compound list tag "Deaths" of {_file} to {_entries::*}
+    save nbt file of {_file}
+
+    send "{@success}{@prefix}{@main} {@deleted-sucess}" to {_viewer}
