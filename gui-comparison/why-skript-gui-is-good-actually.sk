@@ -49,9 +49,6 @@ on inventory click:
             cancel event
 
 # prevent drags into inv
-import:
-    org.bukkit.event.inventory.InventoryDragEvent
-
-on InventoryDragEvent:
-    if event.getInventory() is metadata value "gui" of event.getWhoClicked():
+on inventory drag:
+    if player's current inventory is metadata value "gui" of player:
         cancel event
