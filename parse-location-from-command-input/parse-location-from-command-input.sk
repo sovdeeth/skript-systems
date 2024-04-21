@@ -1,0 +1,179 @@
+# --
+# Parse Location from Command Input.
+# Provides functions to allow Minecraft-like coordinates in commands (^ and ~)
+# --
+# 
+# Authors (add your name if you edit this file.):
+#   - Sovde
+# 
+# To use, add text arguments to your command to capture the coordinates.
+# Feed these arguments into the locationFromCommandInput function, 
+# along with an origin location (usually the sender's location).
+# The function will return the origin location modified by the inputs.
+# This follows typical Minecraft command coordinates, which can be read about on the wiki:
+# https://minecraft.wiki/w/Coordinates#Commands
+#
+# You do not need to supply all 3 coordinates, the function will work fine if one or more are not set.
+# You can also use numbers as inputs. 12 will be treated the same as "12".
+# Finally, you can also mix and match normal coords, ~, and ^. Just remember they're applied in xyz order.
+#
+# Advanced users may want to use the parsed coordinates on their own. 
+# Please see the parseCoordinate() and applyParsedCoordinate() functions for that purpose.
+#
+# Examples of use:
+
+command /teleport-me <x:text> <y:text> <z:text>:
+    executable by: player
+    trigger:
+        teleport player to locationFromCommandInput({_x}, {_y}, {_z}, player)
+
+
+# --
+# Functions
+# --
+
+# Takes in 3 text/number inputs and an origin location. 
+# Applies the 3 inputs in x/y/z order to the origin and returns the final location.
+# 
+# parameters:
+# - x: the x value, as a text or a number. Text must be a parsable number, preceeded by nothing, "^", or "~".
+# - y: the y value, as a text or a number. Text must be a parsable number, preceeded by nothing, "^", or "~".
+# - z: the z value, as a text or a number. Text must be a parsable number, preceeded by nothing, "^", or "~".
+# returns the origin location modified by the 3 values.
+function locationFromCommandInput(x: object, y: object, z: object, origin: location) returns location:
+    # parse x/y/z
+    set {_x::*} to parseCoordinate({_x})
+    set {_y::*} to parseCoordinate({_y})
+    set {_z::*} to parseCoordinate({_z})
+
+    # apply x/y/z
+    set {_location} to applyParsedCoordinate("x", {_x::*}, {_origin})
+    set {_location} to applyParsedCoordinate("y", {_y::*}, {_location})
+    set {_location} to applyParsedCoordinate("z", {_z::*}, {_location})
+
+    return {_location}
+
+# Parses a text or number into a "parsed coordinate", explained below.
+# 
+# parameters:
+# - input: a text or a number. Text must be a parsable number, preceeded by nothing, "^", or "~".
+# returns the following information in order:
+# value: a number
+# type: a string, either "absolute", "relative", or "local", or "invalid" if the input was bad.
+#  - absolute: a literal coordinate in the world
+#  - relative: a simple offset from the origin
+#  - local: an offset based on the local frame of the origin, +x = right, +y = up, +z = forwards
+local function parseCoordinate(input: object) returns objects:
+    # number means absolute:
+    if {_input} is a number:
+        return {_input}, "absolute"
+    
+    # only numbers and strings are valid
+    if {_input} is not a text:
+        return 0, "invalid"
+
+    # check for simple number as text
+    set {_number} to {_input} parsed as a number
+    if {_number} is set:
+        return {_number}, "absolute"
+
+    # check for relative (~) or local (^)
+    if any:
+        {_input} starts with "~"
+        {_input} starts with "^"
+    then:
+        # parse type
+        set {_type} to first character of {_input}
+        set {_type} to "relative" if {_type} is "~" else "local"
+
+        # parse value
+        set {_value} to (substring of {_input} from 2 to length of {_input} ? "0") parsed as number
+        if {_value} is not set:
+            return 0, "invalid"
+        
+        return {_value}, {_type}
+    else:
+        return 0, "invalid"
+
+# Applies the parsed coordinate info to the specified coord of the given location
+# 
+# parameters:
+# - coord: either "x", "y", or "z"
+# - info: the info of the parsed coordinate. A number, followed by a type ("absolute", "relative", "local", or "invalid")
+# - location: the location to change
+# returns the modified location, or itself if the coord is invalid        
+local function applyParsedCoordinate(coord: string, info: objects, location: location) returns location:
+    set {_value} to {_info::1}
+    set {_type} to {_info::2}
+
+    if any:
+        {_value} is 0
+        {_type} is "invalid"
+    then:
+        return {_location}
+
+    if {_type} is "absolute":
+        return setCoordinate({_coord}, {_value}, {_location})
+    else if {_type} is "relative":
+        set {_value} to getCoordinate({_coord}, {_location}) + {_value}
+        return setCoordinate({_coord}, {_value}, {_location})
+    else if {_type} is "local":
+        set {_axis} to getLocalAxis({_coord}, {_location})
+        return {_location} ~ ({_axis} * {_value})
+
+    return {_location}
+
+# sets the x, y, or z coordinate of the given location to the given value
+# 
+# parameters:
+# - coord: either "x", "y", or "z"
+# - value: the new number to set the coord to
+# - location: the location to change
+# returns the modified location, or itself if the coord is invalid
+local function setCoordinate(coord: string, value: number, location: location) returns location:
+    if {_coord} is "x":
+        set x coordinate of {_location} to {_value}
+    else if {_coord} is "y":
+        set y coordinate of {_location} to {_value}
+    else if {_coord} is "z":
+        set z coordinate of {_location} to {_value}
+    return {_location}
+
+# gets the x, y, or z coordinate of the given location
+# 
+# parameters:
+# - coord: either "x", "y", or "z"
+# - location: the location to change
+# returns the coordinate value, or none if the coord is invalid
+local function getCoordinate(coord: string, location: location) returns number:
+    if {_coord} is "x":
+        return x coordinate of {_location}
+    else if {_coord} is "y":
+        return y coordinate of {_location}
+    else if {_coord} is "z":
+        return z coordinate of {_location}
+    return {_none}
+
+# gets the unit vector along the local x/y/z axis of a location
+# 
+# parameters:
+# - coord: either "x", "y", or "z"
+# - location: the location to use
+# returns the unit vector along the local x/y/z axis of location, or none if the coord is invalid
+local function getLocalAxis(coord: string, location: location) returns vector:
+    set {_z} to vector from yaw ({_location}'s yaw) and pitch ({_location}'s pitch) 
+    if {_coord} is "z":
+        return {_z}
+
+    set {_x} to {_z}
+    # dangerous if {_z} is (0, y, 0)? FP error and -0 may help, should work ok in vast majority of cases
+    add 90 to yaw of {_x}
+    set y of {_x} to 0
+    set vector length of {_x} to 1 
+    if {_coord} is "x":
+        return {_x}
+
+    rotate {_z} around {_x} by 90 degrees
+    if {_coord} is "y":
+        return {_z}
+    return {_none}
