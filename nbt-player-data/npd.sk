@@ -1,0 +1,163 @@
+# NBT Player Data
+# Basic NBT-based player data system
+# Stores strings and numbers in NBT, but accessible via variables.
+
+# Example:
+# {-npd::%player%::strength} = 1
+# This value is stored in npd_data/<player's uuid>.dat as {strength: 1}
+# All values under {-npd::%player%::...} are stored in the file.
+
+# Use npd_load_player_data() to load data into variables
+# The save function saves data to nbt
+# The unload function saves data and clears the variables.
+
+# By default, data is loaded when the player joins, saved every five minutes, and unloaded when they quit.
+
+# NOTE: ONLY STRINGS AND NUMBERS WILL BE STORED. NO COMPLEX TYPES (yet)
+
+options:
+    # The prefix for the variable name. Defaults to -npd, meaning variables are accessed like {-npd::%player%::data...}.
+    prefix: -npd
+
+    # The duration between automated saves. Defaults to 5 minutes.
+    save-duration: 5 minutes
+
+    # data directory. Defaults to npd_data. Relative to the server's root folder.
+    directory: npd_data
+
+    # default values. The nbt file at this location will be used to populate the values of a player with no data. If the file does not exist, no data will be populated.
+    default-values: npd_data/default.dat
+
+
+# #####################
+# Functions You Can Use
+# #####################
+
+# Use this to load player data from nbt into variables
+function npd_load_player_data(player: offlineplayer):
+    set {_nbt} to get_raw_data({_player})
+    set_variables({_nbt}, "{@prefix}::%{_player}'s uuid%")
+
+# Use this to save player data without clearing any variables
+function npd_save_player_data(player: offlineplayer):
+    set {_nbt} to get_raw_data({_player})
+    set_nbt({_nbt}, "{@prefix}::%{_player}'s uuid%")
+    save_raw_data({_player})
+
+# Use this to save and unload player data, clearing the player's variables.
+function npd_unload_player_data(player: offlineplayer):
+    npd_save_player_data({_player})
+    save_raw_data({_player})
+    delete {-npd-loaded::%{_player}%}
+    delete {{@prefix}::%{_player}%::*}
+
+
+# ##################################
+# Default Join/Leave/Saving Behavior
+# ##################################
+
+on join:
+    npd_load_player_data(player)
+    set {_guard} to unix timestamp of now
+    set metadata "npd loop guard" of player to {_guard}
+    while metadata "npd loop guard" of player is {_guard}:
+        # save
+        if {_skip} is false:
+            npd_save_player_data(player)
+        set {_skip} to false
+        wait {@save-duration}
+
+on leave:
+    npd_unload_player_data(player)
+    clear metadata "npd loop guard" of player
+
+
+# #########################################################
+# INTERNALS : ONLY TOUCH IF YOU'RE CONFIDENT IN YOUR SKILLS
+# #########################################################
+
+using for loops
+
+# clear vars on startup
+on skript load:
+    clear {-npd-loaded::*}
+    clear {{@prefix}::*}
+
+# get the raw nbt, and substitute default values if needed
+local function get_raw_data(player: offlineplayer) returns nbtcompound:
+    if {-npd-loaded::%{_player}%} is not set:
+        if nbt file "{@directory}/%{_player}'s uuid%.dat" doesn't exist:
+            if nbt file "{@default-values}" exists:
+                set {-npd-loaded::%{_player}%} to (nbt compound from file "{@directory}/%{_player}'s uuid%.dat")
+                copy_nbt((nbt compound copy from file "{@default-values}"), {-npd-loaded::%{_player}%})
+                save nbt file of {-npd-loaded::%{_player}%}
+                return {-npd-loaded::%{_player}%}
+        set {-npd-loaded::%{_player}%} to (nbt compound from file "{@directory}/%{_player}'s uuid%.dat")
+    return {-npd-loaded::%{_player}%}
+
+# save the raw nbt
+local function save_raw_data(player: offlineplayer):
+    save nbt file of get_raw_data({_player})
+
+# copy tags from one compound to another
+local function copy_nbt(from: nbtcompound, to: nbtcompound):
+    for {_tag} in nbt tags of {_from}:
+        set {_type} to nbt tag type of tag {_tag} of {_from}
+        set {_type} {_tag} of {_to} to {_type} {_tag} of {_from}
+
+# recursively loop through nbt and set vars accordingly
+local function set_variables(nbt: nbtcompound, var: string):
+    locally suppress starting with expression warnings
+    for {_tag} in nbt tags of {_nbt}:
+        set {_type} to nbt tag type of tag {_tag} of {_nbt}
+        if {_type} is compound tag:
+            # nested
+            set_variables(compound tag {_tag} of {_nbt}, {_var} + "::%{_tag}%")
+        else if {_type} is compound list tag, or byte array tag:
+            # list nested
+            broadcast "invalid type %{_type}%"
+            stop
+        else if {_type} is double list tag, float list tag, int list tag, long list tag, or string list tag:
+            # normal list, set directly:
+            set {%{_var}%::%{_tag}%::*} to {_type} {_tag} of {_nbt} 
+        else if {_type} is int array tag:
+            # int array, treat as UUID:
+            set {%{_var}%::%{_tag}%} to uuid tag {_tag} of {_nbt} 
+        else:
+            # normal value, set directly:
+            set {%{_var}%::%{_tag}%} to {_type} {_tag} of {_nbt} 
+
+# recursively loop through var and set nbt accordingly
+local function set_nbt(nbt: nbtcompound, var: string):
+    locally suppress starting with expression warnings
+    for {_index} in indices of {%{_var}%::*}:
+        set {_value} to {%{_var}%::%{_index}%}
+        if {_value} is set:
+            # single value, set directly:
+            set_nbt_value({_nbt}, {_index}, {_value})
+        else if {%{_var}%::%{_index}%::1} is set:
+            # normal list, set directly
+            set_nbt_list({_nbt}, {_index}, {%{_var}%::%{_index}%::*})
+        else:
+            # empty list value, nest:
+            set_nbt((compound tag {_index} of {_nbt}), {_var} + "::%{_index}%")
+
+# determine type and set single value
+local function set_nbt_value(nbt: nbtcompound, tag: string, value: object):
+    if {_value} is a string:
+        set string tag {_tag} of {_nbt} to {_value}
+    else if {_value} is a boolean:
+        set boolean tag {_tag} of {_nbt} to {_value}
+    else if {_value} is an integer:
+        set long tag {_tag} of {_nbt} to {_value}
+    else if {_value} is a number:
+        set double tag {_tag} of {_nbt} to {_value}
+
+# determine type and set list value
+local function set_nbt_list(nbt: nbtcompound, tag: string, values: objects):
+    if {_values::*} are strings:
+        set string list tag {_tag} of {_nbt} to {_values::*}
+    else if {_values::*} are booleans or integers:
+        set long list tag {_tag} of {_nbt} to {_values::*}
+    else if {_values::*} are numbers:
+        set double list tag {_tag} of {_nbt} to {_values::*}
